@@ -1,12 +1,9 @@
-// src/TableNode.jsx
-import { memo, useState, useRef, useEffect } from "react";
+import { memo } from "react";
 import { Handle, Position } from "reactflow";
 
 const TableNode = ({ data }) => {
   const bg = data.isViewOrCTE ? "#f0e6ff" : "#fff";
   const border = data.isViewOrCTE ? "2px solid #a855f7" : "1px solid #fff";
-
-  const [openField, setOpenField] = useState(null);
 
   return (
     <div
@@ -37,97 +34,71 @@ const TableNode = ({ data }) => {
 
       {/* Field List */}
       <div style={{ padding: "4px 8px" }}>
-        {data.fields.map((f, idx) => (
-          <div
-            key={idx}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 12,
-              marginBottom: 3,
-              alignItems: "center",
-              position: "relative",
-              padding: "4px 12px",
-              cursor: f.calculation ? "pointer" : "default",
-            }}
-            onClick={() =>
-              setOpenField(openField === f.name ? null : f.name)
-            }
-          >
-            {/* Left Handle (incoming) */}
-            <Handle
-              type="target"
-              position={Position.Left}
-              id={`${data.label}-${f.name}`}
-              style={{
-                background: "#555",
-                width: 8,
-                height: 8,
-                position: "absolute",
-                left: -6,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            />
+        {data.fields.map((f, idx) => {
+          const isSelected =
+            data.selectedField?.nodeId === data.label &&
+            data.selectedField?.fieldName === f.name;
 
-            {/* Field Name */}
-            <span
+          return (
+            <div
+              key={idx}
               style={{
-                color: f.calculation ? "#333" : "inherit",
-                fontWeight: f.calculation ? "500" : "normal",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 12,
+                marginBottom: 3,
+                alignItems: "center",
+                position: "relative",
+                padding: "4px 12px",
+                cursor: "pointer",
+                background: isSelected ? "#f3f3f3" : "transparent",
+                borderRadius: 4,
               }}
+              onClick={() => data.onFieldClick?.(f.name, f)}
             >
-              {f.name}
-            </span>
-
-            {/* Overlay (calculation expression) */}
-            {openField === f.name && f.calculation && (
-              <div
+              {/* Left Handle */}
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`${data.label}-${f.name}`}
                 style={{
+                  background: "#555",
+                  width: 8,
+                  height: 8,
                   position: "absolute",
-                  top: "100%",
-                  left: "10px",
-                  background: "#fff",
-                  border: "1px solid #ccc",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-                  zIndex: 100,
-                  whiteSpace: "pre-wrap",
-                  maxWidth: "280px",
-                  marginTop: "2px",
+                  left: -6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              />
+
+              <span
+                style={{
+                  color: f.calculation ? "#333" : "inherit",
+                  fontWeight: isSelected ? "bold" : f.calculation ? "500" : "normal",
                 }}
               >
-                <strong>Calculation:</strong>
-                <div
-                  style={{
-                    marginTop: "4px",
-                    color: "#0084ffff",
-                    fontWeight: 600,
-                  }}
-                >
-                  {f.calculation.expression}
-                </div>
-              </div>
-            )}
+                {f.name}
+              </span>
 
-            {/* Right Handle (outgoing) */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={`${data.label}-${f.name}`}
-              style={{
-                background: "#555",
-                width: 8,
-                height: 8,
-                position: "absolute",
-                right: -6,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            />
-          </div>
-        ))}
+              {/* Right Handle */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`${data.label}-${f.name}`}
+                style={{
+                  background: "#555",
+                  width: 8,
+                  height: 8,
+                  position: "absolute",
+                  right: -6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

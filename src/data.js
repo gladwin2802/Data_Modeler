@@ -1,5 +1,4 @@
 // src/data.js
-// import rawModel from "./grok_output/VendorLeadTimeOverview.json";
 import rawModel from "./grok_output/AccountsPayable.json";
 
 export function modelToFlow() {
@@ -27,37 +26,39 @@ export function modelToFlow() {
       },
     });
 
-    // Add edges based on "ref"
+    // 🔹 Normal ref edges
     Object.entries(entity.fields).forEach(([fieldName, field]) => {
       if (field.ref) {
         field.ref.forEach((ref) => {
           const [sourceEntity, sourceField] = ref.split(".");
           edges.push({
-            id: `${sourceEntity}.${sourceField}->${entityName}.${fieldName}`,
+            id: `ref-${sourceEntity}.${sourceField}->${entityName}.${fieldName}`, // unique
+            ref_type: "normal",
+            type: "smoothstep",
             source: sourceEntity,
             target: entityName,
             sourceHandle: `${sourceEntity}-${sourceField}`,
             targetHandle: `${entityName}-${fieldName}`,
-            type: "smoothstep",
             animated: true,
-            style: { stroke: "#fd5d5dff", margin: "0 20px" },
+            style: { stroke: "#fd5d5dff" },
           });
         });
       }
 
-      // Add dashed edges for calculations
+      // 🔹 Calculation edges (different style prefix)
       if (field.calculation?.ref) {
         field.calculation.ref.forEach((ref) => {
           const [srcE, srcF] = ref.split(".");
           edges.push({
-            id: `calc-${srcE}.${srcF}->${entityName}.${fieldName}`,
+            id: `calc-${srcE}.${srcF}->${entityName}.${fieldName}`, // unique
+            ref_type: "calculation",
             source: srcE,
+            type: "smoothstep",
             target: entityName,
             sourceHandle: `${srcE}-${srcF}`,
             targetHandle: `${entityName}-${fieldName}`,
-            type: "smoothstep",
             animated: false,
-            style: { stroke: "#0066ffff", strokeDasharray: "5,5" },
+            style: { stroke: "#0066ff", strokeDasharray: "5,5" },
           });
         });
       }
