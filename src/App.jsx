@@ -7,6 +7,7 @@ import ReactFlow, {
 } from "reactflow";
 import TableNode from "./components/TableNode/TableNode";
 import EdgeConfigDialog from "./components/EdgeConfigDialog";
+import TableTypeDialog from "./components/TableTypeDialog";
 import FlowHeader from "./components/FlowHeader";
 import EdgeContextMenu from "./components/EdgeContextMenu";
 import FieldDrawer from "./components/FieldDrawer";
@@ -86,6 +87,7 @@ export default function App() {
     const [editingAliases, setEditingAliases] = useState({});
     const [edgeConfigDialog, setEdgeConfigDialog] = useState(null);
     const [edgeContextMenu, setEdgeContextMenu] = useState(null);
+    const [tableTypeDialog, setTableTypeDialog] = useState(false);
 
     // Layout always uses LR direction
 
@@ -360,18 +362,7 @@ export default function App() {
                 {/* Header */}
                 <FlowHeader
                     onLayout={onLayout}
-                    onAddNewTable={() => {
-                        const newTableInfo = handleAddNewTable();
-                        if (newTableInfo && centerNodeRef.current) {
-                            // Use setTimeout to ensure node is rendered before navigating
-                            setTimeout(() => {
-                                centerNodeRef.current(
-                                    newTableInfo.nodeId,
-                                    newTableInfo.position
-                                );
-                            }, 100);
-                        }
-                    }}
+                    onAddNewTable={() => setTableTypeDialog(true)}
                     onExport={onExport}
                     showNormalRefs={showNormalRefs}
                     showCalcRefs={showCalcRefs}
@@ -455,6 +446,44 @@ export default function App() {
                         initialCalculationExpression={
                             edgeConfigDialog.existingCalculationExpression
                         }
+                    />
+                </div>
+            )}
+
+            {/* Table Type Selection Dialog */}
+            {tableTypeDialog && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0, 0, 0, 0.65)",
+                        backdropFilter: "blur(6px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        animation: "fadeIn 200ms ease",
+                    }}
+                    onClick={() => setTableTypeDialog(false)}
+                >
+                    <TableTypeDialog
+                        onConfirm={(tableType) => {
+                            const newTableInfo = handleAddNewTable(tableType);
+                            if (newTableInfo && centerNodeRef.current) {
+                                // Use setTimeout to ensure node is rendered before navigating
+                                setTimeout(() => {
+                                    centerNodeRef.current(
+                                        newTableInfo.nodeId,
+                                        newTableInfo.position
+                                    );
+                                }, 100);
+                            }
+                            setTableTypeDialog(false);
+                        }}
+                        onCancel={() => setTableTypeDialog(false)}
                     />
                 </div>
             )}

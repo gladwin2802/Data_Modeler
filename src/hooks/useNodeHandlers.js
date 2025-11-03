@@ -223,7 +223,7 @@ export const useNodeHandlers = (
         [setNodes]
     );
 
-    const handleAddNewTable = useCallback(() => {
+    const handleAddNewTable = useCallback((tableType = "BASE") => {
         const tableName = generateUniqueTableName(nodes);
         const position = calculateCenterPosition();
 
@@ -235,7 +235,7 @@ export const useNodeHandlers = (
                 label: tableName,
                 alias: "",
                 fields: [],
-                isViewOrCTE: false,
+                tableType: tableType,
             },
         };
 

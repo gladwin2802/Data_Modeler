@@ -4,21 +4,37 @@ import { FiEdit3, FiCheck, FiTrash2 } from "react-icons/fi";
  * Header component for TableNode
  */
 const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
-    // Check if it's a VIEW or CTE to apply different themes
-    const isView = data.label?.includes("VIEW_");
-    const isCTE = data.label?.includes("CTE_");
+    // Check table type to apply different themes
+    const tableType = data.tableType || "BASE";
     
-    // Green gradient for views, purple gradient for CTEs, gray for base tables
-    const headerBackground = isView
-        ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-        : isCTE
-        ? "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
-        : "linear-gradient(135deg, #4b5563 0%, #374151 100%)";
+    // Color scheme based on table type
+    const getHeaderStyle = () => {
+        switch (tableType) {
+            case "VIEW":
+                return {
+                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    typeLabel: "VIEW",
+                };
+            case "CTE":
+                return {
+                    background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                    typeLabel: "CTE",
+                };
+            case "BASE":
+            default:
+                return {
+                    background: "linear-gradient(135deg, #4b5563 0%, #374151 100%)",
+                    typeLabel: "BASE",
+                };
+        }
+    };
+
+    const headerStyle = getHeaderStyle();
     
     return (
         <div
             style={{
-                background: headerBackground,
+                background: headerStyle.background,
                 color: "#fff",
                 padding: "12px 14px",
                 fontWeight: 600,

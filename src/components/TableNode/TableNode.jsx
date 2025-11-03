@@ -7,17 +7,26 @@ import TableNodeAddField from "./TableNodeAddField";
  * Main TableNode component
  */
 const TableNode = ({ data }) => {
-    // Check if it's a VIEW or CTE to apply different themes
-    const isView = data.label?.includes("VIEW_");
-    const isCTE = data.label?.includes("CTE_");
+    // Get table type to apply different themes
+    const tableType = data.tableType || "BASE";
 
-    // Green theme for views, purple theme for CTEs, default for base tables
-    const bg = isView ? "#ecfdf5" : isCTE ? "#f0e6ff" : "#fff";
-    const border = isView
-        ? "2px solid #10b981"
-        : isCTE
-        ? "2px solid #a855f7"
-        : "1px solid #fff";
+    // Color scheme based on table type
+    let bg, border;
+    switch (tableType) {
+        case "VIEW":
+            bg = "#ecfdf5";
+            border = "2px solid #10b981";
+            break;
+        case "CTE":
+            bg = "#f0e6ff";
+            border = "2px solid #a855f7";
+            break;
+        case "BASE":
+        default:
+            bg = "#fff";
+            border = "1px solid #fff";
+            break;
+    }
 
     const [editingField, setEditingField] = useState(null);
 

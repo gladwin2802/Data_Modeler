@@ -1,4 +1,17 @@
 /**
+ * Add prefix to table name
+ * @param {string} displayName - Entity name without prefix
+ * @param {string} tableType - Type: 'BASE', 'CTE', 'VIEW'
+ * @returns {string} Entity name with prefix
+ */
+function addTablePrefix(displayName, tableType) {
+    if (tableType === "BASE") return `BASE_${displayName}`;
+    if (tableType === "CTE") return `CTE_${displayName}`;
+    if (tableType === "VIEW") return `VIEW_${displayName}`;
+    return displayName;
+}
+
+/**
  * Converts ReactFlow nodes and edges back to the JSON model format
  * @param {Array} nodes - Array of ReactFlow nodes
  * @param {Array} edges - Array of ReactFlow edges
@@ -9,7 +22,9 @@ export function flowToModel(nodes, edges) {
 
     // Process each node
     nodes.forEach((node) => {
-        const entityName = node.data.label || node.id;
+        const displayName = node.data.label || node.id;
+        const tableType = node.data.tableType || "BASE";
+        const entityName = addTablePrefix(displayName, tableType);
         const alias = node.data.alias || "";
         
         const entity = {
@@ -28,15 +43,19 @@ export function flowToModel(nodes, edges) {
                     .filter(
                         (e) =>
                             e.ref_type === "normal" &&
-                            e.target === entityName &&
-                            e.targetHandle === `${entityName}-${fieldName}`
+                            e.target === displayName &&
+                            e.targetHandle === `${displayName}-${fieldName}`
                     )
                     .map((e) => {
                         const sourceFieldName = e.sourceHandle.replace(
                             `${e.source}-`,
                             ""
                         );
-                        return `${e.source}.${sourceFieldName}`;
+                        // Find the source node to get its table type
+                        const sourceNode = nodes.find((n) => n.id === e.source);
+                        const sourceTableType = sourceNode?.data.tableType || "BASE";
+                        const sourceEntityName = addTablePrefix(e.source, sourceTableType);
+                        return `${sourceEntityName}.${sourceFieldName}`;
                     });
 
                 // Collect calculation references from edges
@@ -44,20 +63,35 @@ export function flowToModel(nodes, edges) {
                     .filter(
                         (e) =>
                             e.ref_type === "calculation" &&
-                            e.target === entityName &&
-                            e.targetHandle === `${entityName}-${fieldName}`
+                            e.target === displayName &&
+                            e.targetHandle === `${displayName}-${fieldName}`
                     )
                     .map((e) => {
                         const sourceFieldName = e.sourceHandle.replace(
                             `${e.source}-`,
                             ""
                         );
-                        return `${e.source}.${sourceFieldName}`;
+                        // Find the source node to get its table type
+                        const sourceNode = nodes.find((n) => n.id === e.source);
+                        const sourceTableType = sourceNode?.data.tableType || "BASE";
+                        const sourceEntityName = addTablePrefix(e.source, sourceTableType);
+                        return `${sourceEntityName}.${sourceFieldName}`;
                     });
 
                 // Merge existing refs from field data with refs from edges
-                // Remove duplicates
-                const existingRefs = field.ref || [];
+                // For existing refs, we need to convert display names back to full names
+                let existingRefs = field.ref || [];
+                existingRefs = existingRefs.map((ref) => {
+                    const [refEntity, refField] = ref.split(".");
+                    // Try to find if this ref entity exists in nodes
+                    const refNode = nodes.find((n) => n.id === refEntity);
+                    if (refNode) {
+                        const refTableType = refNode.data.tableType || "BASE";
+                        return `${addTablePrefix(refEntity, refTableType)}.${refField}`;
+                    }
+                    return ref;
+                });
+                
                 const allNormalRefs = [...new Set([...existingRefs, ...normalRefsFromEdges])];
                 
                 // Handle calculation
@@ -65,7 +99,18 @@ export function flowToModel(nodes, edges) {
                 let calculation = null;
                 if (field.calculation) {
                     // Use existing calculation expression and refs
-                    const calcRefs = field.calculation.ref || [];
+                    let calcRefs = field.calculation.ref || [];
+                    // Convert display names back to full names
+                    calcRefs = calcRefs.map((ref) => {
+                        const [refEntity, refField] = ref.split(".");
+                        // Try to find if this ref entity exists in nodes
+                        const refNode = nodes.find((n) => n.id === refEntity);
+                        if (refNode) {
+                            const refTableType = refNode.data.tableType || "BASE";
+                            return `${addTablePrefix(refEntity, refTableType)}.${refField}`;
+                        }
+                        return ref;
+                    });
                     // Merge with refs from calculation edges
                     const allCalcRefs = [...new Set([...calcRefs, ...calcRefsFromEdges])];
                     
