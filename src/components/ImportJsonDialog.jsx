@@ -170,35 +170,6 @@ const ImportJsonDialog = ({ onConfirm, onCancel }) => {
                     <FiX size={16} />
                     Cancel
                 </button>
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                        padding: "10px 18px",
-                        background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                        color: "#fff",
-                        border: "1px solid rgba(59, 130, 246, 0.5)",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        fontSize: 14,
-                        transition: "all 200ms ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-                    }}
-                    onMouseEnter={(e) => {
-                        e.target.style.boxShadow = "0 6px 16px rgba(59, 130, 246, 0.4)";
-                        e.target.style.transform = "translateY(-1px)";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.target.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.3)";
-                        e.target.style.transform = "translateY(0)";
-                    }}
-                >
-                    <FiUpload size={16} />
-                    Browse Files
-                </button>
             </div>
         </div>
     );

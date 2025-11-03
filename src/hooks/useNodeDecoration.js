@@ -46,6 +46,7 @@ export const useNodeDecoration = (
             ...n,
             data: {
                 ...n.data,
+                nodeId: n.id,
                 tableType: n.data.tableType || "BASE",
                 onFieldClick: (fieldName) => {
                     const fieldData = n.data.fields.find(

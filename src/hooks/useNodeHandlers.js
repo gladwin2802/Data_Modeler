@@ -5,6 +5,7 @@ import {
     generateUniqueTableName,
     calculateCenterPosition,
 } from "../utils/nodeUtils";
+import { addTablePrefix } from "../utils/dataTransform";
 import { getHandleId } from "../utils/edgeUtils";
 
 /**
@@ -227,11 +228,16 @@ export const useNodeHandlers = (
         const tableName = generateUniqueTableName(nodes);
         const position = calculateCenterPosition();
 
+        // Use prefixed entity name as the node id so newly created tables
+        // are consistent with imported nodes which include prefixes.
+        const prefixedId = addTablePrefix(tableName, tableType);
+
         const newNode = {
-            id: tableName,
+            id: prefixedId,
             type: "tableNode",
             position,
             data: {
+                // user-facing label (without prefix)
                 label: tableName,
                 alias: "",
                 fields: [],
@@ -242,18 +248,18 @@ export const useNodeHandlers = (
         setNodes((nds) => [...nds, newNode]);
 
         // Automatically enter edit mode for the new table
-        setEditingNode(tableName);
+        setEditingNode(prefixedId);
         setEditingLabels((prev) => ({
             ...prev,
-            [tableName]: tableName,
+            [prefixedId]: tableName,
         }));
         setEditingAliases((prev) => ({
             ...prev,
-            [tableName]: "",
+            [prefixedId]: "",
         }));
 
         // Return the new node info for navigation
-        return { nodeId: tableName, position };
+        return { nodeId: prefixedId, position };
     }, [nodes, setNodes, setEditingNode, setEditingLabels, setEditingAliases]);
 
     const handleDeleteTable = useCallback(

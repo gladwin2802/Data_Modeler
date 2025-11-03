@@ -30,13 +30,14 @@ const TableNode = ({ data }) => {
 
     const [editingField, setEditingField] = useState(null);
 
-    // Get edges for a specific field
+    // Get edges for a specific field — use nodeId (prefixed) so handles
+    // match the ones created during import (which use full entity ids).
     const getFieldEdges = (fieldName) => {
-        const handleId = `${data.label}-${fieldName}`;
+        const nodeId = data.nodeId || data.label;
+        const handleId = `${nodeId}-${fieldName}`;
         return (
             data.edges?.filter(
-                (e) =>
-                    e.sourceHandle === handleId || e.targetHandle === handleId
+                (e) => e.sourceHandle === handleId || e.targetHandle === handleId
             ) || []
         );
     };
@@ -77,7 +78,7 @@ const TableNode = ({ data }) => {
             <div style={{ padding: "8px 12px" }}>
                 {data.fields.map((field, idx) => {
                     const isSelected =
-                        data.selectedField?.nodeId === data.label &&
+                        data.selectedField?.nodeId === (data.nodeId || data.label) &&
                         data.selectedField?.fieldName === field.name;
 
                     return (

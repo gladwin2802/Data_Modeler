@@ -46,22 +46,26 @@ export function addTablePrefix(entityName, tableType) {
  * @param {Object} modelData - The model data object (default: imported rawModel)
  * @returns {Object} Object containing nodes and edges arrays
  */
-export function modelToFlow(modelData = rawModel) {
+export function modelToFlow(modelData = {entities: {}}) {
   const nodes = [];
   const edges = [];
   let y = 0;
   const rowHeight = 180;
 
   Object.entries(modelData.entities).forEach(([entityName, entity]) => {
+    // entityName is the full name (may include prefix like BASE_, CTE_, VIEW_)
     const tableType = extractTableType(entityName);
     const displayName = removeTablePrefix(entityName);
-    const nodeId = displayName;
+    // Use the full entityName (with prefix) as the node id to avoid collisions
+    // when multiple prefixed entities share the same display name.
+    const nodeId = entityName;
 
     nodes.push({
       id: nodeId,
       type: "tableNode",
       position: { x: 0, y },
       data: {
+        // keep a user-friendly label without prefix
         label: displayName,
         alias: entity.alias || "",
         fields: Object.entries(entity.fields).map(([fname, fdata]) => ({
@@ -77,15 +81,15 @@ export function modelToFlow(modelData = rawModel) {
       if (field.ref) {
         field.ref.forEach((ref) => {
           const [sourceEntity, sourceField] = ref.split(".");
-          const sourceDisplayName = removeTablePrefix(sourceEntity);
+          // Use full prefixed entity names for edge endpoints and handles
           edges.push({
-            id: `ref-${sourceDisplayName}.${sourceField}->${displayName}.${fieldName}`,
+            id: `ref-${sourceEntity}.${sourceField}->${entityName}.${fieldName}`,
             ref_type: "normal",
             type: "smoothstep",
-            source: sourceDisplayName,
-            target: displayName,
-            sourceHandle: `${sourceDisplayName}-${sourceField}`,
-            targetHandle: `${displayName}-${fieldName}`,
+            source: sourceEntity,
+            target: entityName,
+            sourceHandle: `${sourceEntity}-${sourceField}`,
+            targetHandle: `${entityName}-${fieldName}`,
             animated: true,
             style: { stroke: "#fd5d5dff" },
           });
@@ -96,15 +100,14 @@ export function modelToFlow(modelData = rawModel) {
       if (field.calculation?.ref) {
         field.calculation.ref.forEach((ref) => {
           const [srcE, srcF] = ref.split(".");
-          const srcDisplayName = removeTablePrefix(srcE);
           edges.push({
-            id: `calc-${srcDisplayName}.${srcF}->${displayName}.${fieldName}`,
+            id: `calc-${srcE}.${srcF}->${entityName}.${fieldName}`,
             ref_type: "calculation",
-            source: srcDisplayName,
+            source: srcE,
             type: "smoothstep",
-            target: displayName,
-            sourceHandle: `${srcDisplayName}-${srcF}`,
-            targetHandle: `${displayName}-${fieldName}`,
+            target: entityName,
+            sourceHandle: `${srcE}-${srcF}`,
+            targetHandle: `${entityName}-${fieldName}`,
             animated: false,
             style: { stroke: "#0066ff", strokeDasharray: "5,5" },
           });

@@ -19,7 +19,10 @@ const TableNodeField = ({
     onDeleteFieldRef,
 }) => {
     const isEditing = editingField === field.name;
-    const handleId = `${data.label}-${field.name}`;
+    // Use nodeId (which contains the full prefixed entity name) when
+    // constructing handle ids so they match imported edges.
+    const nodeId = data.nodeId || data.label;
+    const handleId = `${nodeId}-${field.name}`;
     
     // Keep handles in their original positions (left=target, right=source) for consistency
     // The layout direction will determine node positioning, not handle positions

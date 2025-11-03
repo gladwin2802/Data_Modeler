@@ -22,9 +22,22 @@ export function flowToModel(nodes, edges) {
 
     // Process each node
     nodes.forEach((node) => {
+        // node.id may now be a full prefixed entity name (e.g. BASE_..., CTE_...)
+        // node.data.label holds the user-facing name without prefix.
         const displayName = node.data.label || node.id;
         const tableType = node.data.tableType || "BASE";
-        const entityName = addTablePrefix(displayName, tableType);
+        // If node.id already contains a known prefix, use it as the entity name;
+        // otherwise construct the prefixed name from displayName and tableType.
+        let entityName;
+        if (
+            node.id.startsWith("BASE_") ||
+            node.id.startsWith("CTE_") ||
+            node.id.startsWith("VIEW_")
+        ) {
+            entityName = node.id;
+        } else {
+            entityName = addTablePrefix(displayName, tableType);
+        }
         const alias = node.data.alias || "";
         
         const entity = {
@@ -39,22 +52,22 @@ export function flowToModel(nodes, edges) {
                 const fieldData = {};
 
                 // Collect normal references from edges
+                // Collect normal references from edges. Edges use full entity ids
+                // for source/target (e.g. BASE_...), so match against entityName.
                 const normalRefsFromEdges = edges
                     .filter(
                         (e) =>
                             e.ref_type === "normal" &&
-                            e.target === displayName &&
-                            e.targetHandle === `${displayName}-${fieldName}`
+                            e.target === entityName &&
+                            e.targetHandle === `${entityName}-${fieldName}`
                     )
                     .map((e) => {
-                        const sourceFieldName = e.sourceHandle.replace(
-                            `${e.source}-`,
-                            ""
-                        );
-                        // Find the source node to get its table type
-                        const sourceNode = nodes.find((n) => n.id === e.source);
-                        const sourceTableType = sourceNode?.data.tableType || "BASE";
-                        const sourceEntityName = addTablePrefix(e.source, sourceTableType);
+                        const sourceFieldName = e.sourceHandle.replace(`${e.source}-`, "");
+                        // e.source should be a full entity id when created by modelToFlow
+                        const sourceEntityName = e.source &&
+                            (e.source.startsWith("BASE_") || e.source.startsWith("CTE_") || e.source.startsWith("VIEW_"))
+                            ? e.source
+                            : (nodes.find((n) => n.id === e.source)?.id || addTablePrefix(e.source, "BASE"));
                         return `${sourceEntityName}.${sourceFieldName}`;
                     });
 
@@ -63,31 +76,39 @@ export function flowToModel(nodes, edges) {
                     .filter(
                         (e) =>
                             e.ref_type === "calculation" &&
-                            e.target === displayName &&
-                            e.targetHandle === `${displayName}-${fieldName}`
+                            e.target === entityName &&
+                            e.targetHandle === `${entityName}-${fieldName}`
                     )
                     .map((e) => {
-                        const sourceFieldName = e.sourceHandle.replace(
-                            `${e.source}-`,
-                            ""
-                        );
-                        // Find the source node to get its table type
-                        const sourceNode = nodes.find((n) => n.id === e.source);
-                        const sourceTableType = sourceNode?.data.tableType || "BASE";
-                        const sourceEntityName = addTablePrefix(e.source, sourceTableType);
+                        const sourceFieldName = e.sourceHandle.replace(`${e.source}-`, "");
+                        const sourceEntityName = e.source &&
+                            (e.source.startsWith("BASE_") || e.source.startsWith("CTE_") || e.source.startsWith("VIEW_"))
+                            ? e.source
+                            : (nodes.find((n) => n.id === e.source)?.id || addTablePrefix(e.source, "BASE"));
                         return `${sourceEntityName}.${sourceFieldName}`;
                     });
 
                 // Merge existing refs from field data with refs from edges
                 // For existing refs, we need to convert display names back to full names
+                // Normalize existing refs in the field data. If a ref already
+                // contains a prefix (BASE_/CTE_/VIEW_) keep it. If it uses a
+                // display name, map to the node's id (which is the prefixed name).
                 let existingRefs = field.ref || [];
                 existingRefs = existingRefs.map((ref) => {
                     const [refEntity, refField] = ref.split(".");
-                    // Try to find if this ref entity exists in nodes
-                    const refNode = nodes.find((n) => n.id === refEntity);
+                    if (!refEntity) return ref;
+                    // If already prefixed, leave as-is
+                    if (
+                        refEntity.startsWith("BASE_") ||
+                        refEntity.startsWith("CTE_") ||
+                        refEntity.startsWith("VIEW_")
+                    ) {
+                        return ref;
+                    }
+                    // Try to find node by id or by label
+                    const refNode = nodes.find((n) => n.id === refEntity || n.data?.label === refEntity);
                     if (refNode) {
-                        const refTableType = refNode.data.tableType || "BASE";
-                        return `${addTablePrefix(refEntity, refTableType)}.${refField}`;
+                        return `${refNode.id}.${refField}`;
                     }
                     return ref;
                 });
@@ -100,14 +121,20 @@ export function flowToModel(nodes, edges) {
                 if (field.calculation) {
                     // Use existing calculation expression and refs
                     let calcRefs = field.calculation.ref || [];
-                    // Convert display names back to full names
+                    // Normalize calculation refs similarly to existingRefs
                     calcRefs = calcRefs.map((ref) => {
                         const [refEntity, refField] = ref.split(".");
-                        // Try to find if this ref entity exists in nodes
-                        const refNode = nodes.find((n) => n.id === refEntity);
+                        if (!refEntity) return ref;
+                        if (
+                            refEntity.startsWith("BASE_") ||
+                            refEntity.startsWith("CTE_") ||
+                            refEntity.startsWith("VIEW_")
+                        ) {
+                            return ref;
+                        }
+                        const refNode = nodes.find((n) => n.id === refEntity || n.data?.label === refEntity);
                         if (refNode) {
-                            const refTableType = refNode.data.tableType || "BASE";
-                            return `${addTablePrefix(refEntity, refTableType)}.${refField}`;
+                            return `${refNode.id}.${refField}`;
                         }
                         return ref;
                     });
@@ -128,24 +155,20 @@ export function flowToModel(nodes, edges) {
                 }
 
                 // Match the format: if field has no refs and no calculation, use empty object {}
-                // Otherwise include ref array and/or calculation
+                // Otherwise include ref array (only when non-empty) and/or calculation
                 if (allNormalRefs.length === 0 && !calculation) {
                     // Simple field with no refs or calculations - use empty object
                     entity.fields[fieldName] = {};
                 } else {
-                    // Field has refs or calculations - include them
+                    // Field has refs and/or calculations - include them
                     if (allNormalRefs.length > 0) {
                         fieldData.ref = allNormalRefs;
-                    } else {
-                        // Some fields in the format have ref: [] even when empty
-                        // especially when there's a calculation
-                        fieldData.ref = [];
                     }
-                    
+
                     if (calculation) {
                         fieldData.calculation = calculation;
                     }
-                    
+
                     entity.fields[fieldName] = fieldData;
                 }
             });

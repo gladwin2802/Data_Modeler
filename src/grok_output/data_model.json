@@ -1,0 +1,489 @@
+{
+  "entities": {
+    "BASE_Languages_T002": {
+      "fields": {
+        "LanguageKey_SPRAS": {}
+      }
+    },
+    "BASE_fiscal_date_dim": {
+      "alias": "FiscalDateDimension",
+      "fields": {
+        "MANDT": {},
+        "periv": {},
+        "Date": {},
+        "FiscalYear": {},
+        "FiscalPeriod": {}
+      }
+    },
+    "BASE_CompaniesMD": {
+      "alias": "Companies",
+      "fields": {
+        "Client_MANDT": {},
+        "FiscalYearVariant_PERIV": {},
+        "CompanyCode_BUKRS": {},
+        "CurrencyCode_WAERS": {}
+      }
+    },
+    "BASE_CurrencyConversion": {
+      "alias": "Currency",
+      "fields": {
+        "Client_MANDT": {},
+        "ConvDate": {},
+        "FromCurrency_FCURR": {},
+        "ToCurrency_TCURR": {},
+        "ExchangeRate_UKURS": {},
+        "ExchangeRateType_KURST": {}
+      }
+    },
+    "BASE_FinancialStatement": {
+      "fields": {
+        "Client": {},
+        "CompanyCode": {},
+        "Parent": {},
+        "Node": {},
+        "BalanceSheetAccountIndicator": {},
+        "FinancialStatementItem": {},
+        "FiscalYear": {},
+        "FiscalPeriod": {},
+        "FiscalQuarter": {},
+        "ChartOfAccounts": {},
+        "HierarchyName": {},
+        "HierarchyVersion": {},
+        "BusinessArea": {},
+        "LedgerInGeneralLedgerAccounting": {},
+        "Level": {},
+        "IsLeafNode": {},
+        "CompanyText": {},
+        "AmountInLocalCurrency": {},
+        "CurrencyKey": {}
+      }
+    },
+    "BASE_FSVTextsMD": {
+      "fields": {
+        "Client_MANDT": {},
+        "HierarchyID_HRYID": {},
+        "HierarchyVersion_HRYVER": {},
+        "HierarchyNode_HRYNODE": {},
+        "LanguageKey_SPRAS": {},
+        "HierarchyNodeDescription_NODETXT": {}
+      }
+    },
+    "BASE_GLAccountsMD": {
+      "alias": "GLText",
+      "fields": {
+        "Client_MANDT": {},
+        "ChartOfAccounts_KTOPL": {},
+        "GlAccountNumber_SAKNR": {},
+        "Language_SPRAS": {},
+        "GlAccountLongText_TXT50": {}
+      }
+    },
+    "CTE_LanguageKey": {
+      "fields": {
+        "LanguageKey_SPRAS": {
+          "ref": [
+            "BASE_Languages_T002.LanguageKey_SPRAS"
+          ]
+        }
+      }
+    },
+    "CTE_CurrencyConversion": {
+      "fields": {
+        "Client_MANDT": {
+          "ref": [
+            "BASE_CompaniesMD.Client_MANDT"
+          ]
+        },
+        "periv": {
+          "calculation": {
+            "expression": "MAX(Companies.FiscalYearVariant_PERIV)",
+            "ref": [
+              "BASE_CompaniesMD.FiscalYearVariant_PERIV"
+            ]
+          }
+        },
+        "CompanyCode_BUKRS": {
+          "ref": [
+            "BASE_CompaniesMD.CompanyCode_BUKRS"
+          ]
+        },
+        "FiscalYear": {
+          "ref": [
+            "BASE_fiscal_date_dim.FiscalYear"
+          ]
+        },
+        "FiscalPeriod": {
+          "ref": [
+            "BASE_fiscal_date_dim.FiscalPeriod"
+          ]
+        },
+        "FromCurrency_FCURR": {
+          "ref": [
+            "BASE_CurrencyConversion.FromCurrency_FCURR"
+          ]
+        },
+        "ToCurrency_TCURR": {
+          "ref": [
+            "BASE_CurrencyConversion.ToCurrency_TCURR"
+          ]
+        },
+        "ExchangeRate": {
+          "calculation": {
+            "expression": "MAX_BY(Currency.ExchangeRate_UKURS, FiscalDateDimension.Date)",
+            "ref": [
+              "BASE_CurrencyConversion.ExchangeRate_UKURS",
+              "BASE_fiscal_date_dim.Date"
+            ]
+          }
+        },
+        "MaxExchangeRate": {
+          "calculation": {
+            "expression": "MAX(Currency.ExchangeRate_UKURS)",
+            "ref": [
+              "BASE_CurrencyConversion.ExchangeRate_UKURS"
+            ]
+          }
+        },
+        "AvgExchangeRate": {
+          "calculation": {
+            "expression": "AVG(Currency.ExchangeRate_UKURS)",
+            "ref": [
+              "BASE_CurrencyConversion.ExchangeRate_UKURS"
+            ]
+          }
+        }
+      }
+    },
+    "CTE_ParentId": {
+      "fields": {
+        "Client": {
+          "ref": [
+            "BASE_FinancialStatement.Client"
+          ]
+        },
+        "CompanyCode": {
+          "ref": [
+            "BASE_FinancialStatement.CompanyCode"
+          ]
+        },
+        "Parent": {
+          "ref": [
+            "BASE_FinancialStatement.Parent"
+          ]
+        },
+        "FinancialStatementItem": {
+          "ref": [
+            "BASE_FinancialStatement.FinancialStatementItem"
+          ]
+        }
+      }
+    },
+    "CTE_FSV": {
+      "alias": "FSV",
+      "fields": {
+        "Client": {
+          "ref": [
+            "BASE_FinancialStatement.Client"
+          ]
+        },
+        "CompanyCode": {
+          "ref": [
+            "BASE_FinancialStatement.CompanyCode"
+          ]
+        },
+        "FiscalYear": {
+          "ref": [
+            "BASE_FinancialStatement.FiscalYear"
+          ]
+        },
+        "FiscalPeriod": {
+          "ref": [
+            "BASE_FinancialStatement.FiscalPeriod"
+          ]
+        },
+        "FiscalQuarter": {
+          "ref": [
+            "BASE_FinancialStatement.FiscalQuarter"
+          ]
+        },
+        "ChartOfAccounts": {
+          "ref": [
+            "BASE_FinancialStatement.ChartOfAccounts"
+          ]
+        },
+        "HierarchyName": {
+          "ref": [
+            "BASE_FinancialStatement.HierarchyName"
+          ]
+        },
+        "HierarchyVersion": {
+          "ref": [
+            "BASE_FinancialStatement.HierarchyVersion"
+          ]
+        },
+        "BusinessArea": {
+          "ref": [
+            "BASE_FinancialStatement.BusinessArea"
+          ]
+        },
+        "LedgerInGeneralLedgerAccounting": {
+          "ref": [
+            "BASE_FinancialStatement.LedgerInGeneralLedgerAccounting"
+          ]
+        },
+        "Node": {
+          "ref": [
+            "BASE_FinancialStatement.Node"
+          ]
+        },
+        "Parent": {
+          "ref": [
+            "BASE_FinancialStatement.Parent"
+          ]
+        },
+        "FinancialStatementItem": {
+          "ref": [
+            "BASE_FinancialStatement.FinancialStatementItem"
+          ]
+        },
+        "Level": {
+          "ref": [
+            "BASE_FinancialStatement.Level"
+          ]
+        },
+        "IsLeafNode": {
+          "ref": [
+            "BASE_FinancialStatement.IsLeafNode"
+          ]
+        },
+        "CompanyText": {
+          "ref": [
+            "BASE_FinancialStatement.CompanyText"
+          ]
+        },
+        "AmountInLocalCurrency": {
+          "ref": [
+            "BASE_FinancialStatement.AmountInLocalCurrency"
+          ]
+        },
+        "CurrencyKey": {
+          "ref": [
+            "BASE_FinancialStatement.CurrencyKey"
+          ]
+        }
+      }
+    },
+    "VIEW_Final": {
+      "fields": {
+        "Client": {
+          "ref": [
+            "CTE_FSV.Client",
+            "BASE_NewTable_1.id"
+          ]
+        },
+        "CompanyCode": {
+          "ref": [
+            "CTE_FSV.CompanyCode"
+          ]
+        },
+        "FiscalYear": {
+          "ref": [
+            "CTE_FSV.FiscalYear"
+          ]
+        },
+        "FiscalPeriod": {
+          "ref": [
+            "CTE_FSV.FiscalPeriod"
+          ],
+          "calculation": {
+            "expression": "MAX(GlAccountNumber_SAKNR)",
+            "ref": [
+              "BASE_GLAccountsMD.GlAccountNumber_SAKNR"
+            ]
+          }
+        },
+        "ChartOfAccounts": {
+          "ref": [
+            "CTE_FSV.ChartOfAccounts"
+          ]
+        },
+        "HierarchyName": {
+          "ref": [
+            "CTE_FSV.HierarchyName"
+          ]
+        },
+        "BusinessArea": {
+          "ref": [
+            "CTE_FSV.BusinessArea"
+          ]
+        },
+        "LedgerInGeneralLedgerAccounting": {
+          "ref": [
+            "CTE_FSV.LedgerInGeneralLedgerAccounting"
+          ]
+        },
+        "Node": {
+          "ref": [
+            "CTE_FSV.Node"
+          ]
+        },
+        "LanguageKey_SPRAS": {
+          "ref": [
+            "CTE_LanguageKey.LanguageKey_SPRAS"
+          ]
+        },
+        "Parent": {
+          "calculation": {
+            "expression": "MAX(FSV.Parent)",
+            "ref": [
+              "CTE_FSV.Parent"
+            ]
+          }
+        },
+        "NodeText": {
+          "calculation": {
+            "expression": "MAX(COALESCE(NodeText.HierarchyNodeDescription_NODETXT, GLText.GlAccountLongText_TXT50))",
+            "ref": [
+              "BASE_FSVTextsMD.HierarchyNodeDescription_NODETXT",
+              "BASE_GLAccountsMD.GlAccountLongText_TXT50"
+            ]
+          }
+        },
+        "ParentText": {
+          "calculation": {
+            "expression": "MAX(ParentText.HierarchyNodeDescription_NODETXT)",
+            "ref": [
+              "BASE_FSVTextsMD.HierarchyNodeDescription_NODETXT"
+            ]
+          }
+        },
+        "Level": {
+          "calculation": {
+            "expression": "MAX(FSV.Level)",
+            "ref": [
+              "CTE_FSV.Level"
+            ]
+          }
+        },
+        "FiscalQuarter": {
+          "calculation": {
+            "expression": "MAX(FSV.FiscalQuarter)",
+            "ref": [
+              "CTE_FSV.FiscalQuarter"
+            ]
+          }
+        },
+        "IsLeafNode": {
+          "calculation": {
+            "expression": "MAX(FSV.IsLeafNode)",
+            "ref": [
+              "CTE_FSV.IsLeafNode"
+            ]
+          }
+        },
+        "CompanyText": {
+          "calculation": {
+            "expression": "MAX(FSV.CompanyText)",
+            "ref": [
+              "CTE_FSV.CompanyText"
+            ]
+          }
+        },
+        "AmountInLocalCurrency": {
+          "calculation": {
+            "expression": "SUM(FSV.AmountInLocalCurrency)",
+            "ref": [
+              "CTE_FSV.AmountInLocalCurrency"
+            ]
+          }
+        },
+        "CumulativeAmountInLocalCurrency": {
+          "calculation": {
+            "expression": "SUM(SUM(FSV.AmountInLocalCurrency)) OVER (PARTITION BY FSV.Client, FSV.CompanyCode, FSV.BusinessArea, FSV.LedgerInGeneralLedgerAccounting, FSV.Node, LanguageKey.LanguageKey_SPRAS, CurrencyConversion.ToCurrency_TCURR ORDER BY FSV.FiscalYear ASC, FSV.FiscalPeriod ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)",
+            "ref": [
+              "CTE_FSV.AmountInLocalCurrency",
+              "CTE_FSV.Client",
+              "CTE_FSV.CompanyCode",
+              "CTE_FSV.BusinessArea",
+              "CTE_FSV.LedgerInGeneralLedgerAccounting",
+              "CTE_FSV.Node",
+              "CTE_LanguageKey.LanguageKey_SPRAS",
+              "CTE_CurrencyConversion.ToCurrency_TCURR",
+              "CTE_FSV.FiscalYear",
+              "CTE_FSV.FiscalPeriod"
+            ]
+          }
+        },
+        "CurrencyKey": {
+          "calculation": {
+            "expression": "MAX(FSV.CurrencyKey)",
+            "ref": [
+              "CTE_FSV.CurrencyKey"
+            ]
+          }
+        },
+        "ExchangeRate": {
+          "calculation": {
+            "expression": "MAX(CurrencyConversion.ExchangeRate)",
+            "ref": [
+              "CTE_CurrencyConversion.ExchangeRate"
+            ]
+          }
+        },
+        "MaxExchangeRate": {
+          "calculation": {
+            "expression": "MAX(CurrencyConversion.MaxExchangeRate)",
+            "ref": [
+              "CTE_CurrencyConversion.MaxExchangeRate"
+            ]
+          }
+        },
+        "AvgExchangeRate": {
+          "calculation": {
+            "expression": "AVG(CurrencyConversion.AvgExchangeRate)",
+            "ref": [
+              "CTE_CurrencyConversion.AvgExchangeRate"
+            ]
+          }
+        },
+        "AmountInTargetCurrency": {
+          "calculation": {
+            "expression": "SUM(FSV.AmountInLocalCurrency * CurrencyConversion.ExchangeRate)",
+            "ref": [
+              "CTE_FSV.AmountInLocalCurrency",
+              "CTE_CurrencyConversion.ExchangeRate"
+            ]
+          }
+        },
+        "CumulativeAmountInTargetCurrency": {
+          "calculation": {
+            "expression": "SUM(SUM(FSV.AmountInLocalCurrency * CurrencyConversion.ExchangeRate)) OVER (PARTITION BY FSV.Client, FSV.CompanyCode, FSV.BusinessArea, FSV.LedgerInGeneralLedgerAccounting, FSV.Node, LanguageKey.LanguageKey_SPRAS, CurrencyConversion.ToCurrency_TCURR ORDER BY FSV.FiscalYear ASC, FSV.FiscalPeriod ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)",
+            "ref": [
+              "CTE_FSV.AmountInLocalCurrency",
+              "CTE_CurrencyConversion.ExchangeRate",
+              "CTE_FSV.Client",
+              "CTE_FSV.CompanyCode",
+              "CTE_FSV.BusinessArea",
+              "CTE_FSV.LedgerInGeneralLedgerAccounting",
+              "CTE_FSV.Node",
+              "CTE_LanguageKey.LanguageKey_SPRAS",
+              "CTE_CurrencyConversion.ToCurrency_TCURR",
+              "CTE_FSV.FiscalYear",
+              "CTE_FSV.FiscalPeriod"
+            ]
+          }
+        },
+        "TargetCurrency_TCURR": {
+          "ref": [
+            "CTE_CurrencyConversion.ToCurrency_TCURR"
+          ]
+        }
+      }
+    },
+    "BASE_NewTable_1": {
+      "fields": {
+        "id": {}
+      }
+    }
+  }
+}
