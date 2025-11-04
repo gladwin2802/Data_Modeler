@@ -1,12 +1,12 @@
 import { FiEdit3, FiCheck, FiTrash2 } from "react-icons/fi";
-
+ 
 /**
  * Header component for TableNode
  */
 const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
     // Check table type to apply different themes
     const tableType = data.tableType || "BASE";
-    
+   
     // Color scheme based on table type
     const getHeaderStyle = () => {
         switch (tableType) {
@@ -28,9 +28,9 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
                 };
         }
     };
-
+ 
     const headerStyle = getHeaderStyle();
-    
+   
     return (
         <div
             style={{
@@ -112,8 +112,8 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
                             onEditClick?.();
                         }}
                         style={{
-                        background: data.isEditing 
-                            ? "rgba(245, 158, 11, 0.9)" 
+                        background: data.isEditing
+                            ? "rgba(50, 109, 226, 0.8)"
                             : "rgba(255, 255, 255, 0.2)",
                         color: "#fff",
                         border: "1px solid rgba(255, 255, 255, 0.3)",
@@ -132,14 +132,14 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
                     }}
                     onMouseEnter={(e) => {
                         e.target.style.background = data.isEditing
-                            ? "rgba(245, 158, 11, 1)"
+                            ? "rgba(50, 109, 226, 1)"
                             : "rgba(255, 255, 255, 0.3)";
                         const tooltip = e.target.nextSibling;
                         if (tooltip) tooltip.style.opacity = "1";
                     }}
                     onMouseLeave={(e) => {
                         e.target.style.background = data.isEditing
-                            ? "rgba(245, 158, 11, 0.9)"
+                            ? "rgba(50, 109, 226, 0.8)"
                             : "rgba(255, 255, 255, 0.2)";
                         const tooltip = e.target.nextSibling;
                         if (tooltip) tooltip.style.opacity = "0";
@@ -176,7 +176,7 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
                         onDeleteClick?.();
                     }}
                     style={{
-                        background: "rgba(239, 68, 68, 0.2)",
+                        background: "rgba(239, 68, 68, 0.8)",
                         color: "#fff",
                         border: "1px solid rgba(239, 68, 68, 0.4)",
                         borderRadius: 6,
@@ -190,16 +190,16 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
                         alignItems: "center",
                         justifyContent: "center",
                         transition: "all 200ms ease",
-                        backdropFilter: "blur(10px)",
+                        // backdropFilter: "blur(10px)",
                         marginLeft: "8px",
                     }}
                     onMouseEnter={(e) => {
-                        e.target.style.background = "rgba(239, 68, 68, 0.3)";
+                        e.target.style.background = "rgba(239, 68, 68, 1)";
                         const tooltip = e.target.nextSibling;
                         if (tooltip) tooltip.style.opacity = "1";
                     }}
                     onMouseLeave={(e) => {
-                        e.target.style.background = "rgba(239, 68, 68, 0.2)";
+                        e.target.style.background = "rgba(239, 68, 68, 0.8)";
                         const tooltip = e.target.nextSibling;
                         if (tooltip) tooltip.style.opacity = "0";
                     }}
@@ -232,6 +232,8 @@ const TableNodeHeader = ({ data, onEditClick, onDeleteClick }) => {
         </div>
     );
 };
-
+ 
 export default TableNodeHeader;
-
+ 
+ 
+ 

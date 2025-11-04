@@ -46,7 +46,8 @@ export function addTablePrefix(entityName, tableType) {
  * @param {Object} modelData - The model data object (default: imported rawModel)
  * @returns {Object} Object containing nodes and edges arrays
  */
-export function modelToFlow(modelData = {entities: {}}) {
+// export function modelToFlow(modelData = {entities: {}}) {
+  export function modelToFlow(modelData = rawModel) {
   const nodes = [];
   const edges = [];
   let y = 0;
