@@ -10,6 +10,7 @@ import EdgeConfigDialog from "../components/IndividualSQLView/EdgeConfigDialog";
 import FlowHeader from "../components/IndividualSQLView/FlowHeader";
 import EdgeContextMenu from "../components/IndividualSQLView/EdgeContextMenu";
 import FieldDrawer from "../components/IndividualSQLView/FieldDrawer";
+import JoinDetailsDrawer from "../components/IndividualSQLView/JoinDetailsDrawer";
 import FitViewHelper from "../components/IndividualSQLView/FitViewHelper";
 import { useFlowState } from "../hooks/useFlowState";
 import { useNodeHandlers } from "../hooks/useNodeHandlers";
@@ -36,6 +37,8 @@ const IndividualSQLView = () => {
     const [edgeConfigDialog, setEdgeConfigDialog] = useState(null);
     const [edgeContextMenu, setEdgeContextMenu] = useState(null);
     const [selectedTableType, setSelectedTableType] = useState("BASE");
+    const [joinDetails, setJoinDetails] = useState(null);
+    const [currentModel, setCurrentModel] = useState(null);
 
     const [showNormalRefs, setShowNormalRefs] = useState(true);
     const [showCalcRefs, setShowCalcRefs] = useState(true);
@@ -113,6 +116,15 @@ const IndividualSQLView = () => {
         });
     }, []);
 
+    const handleJoinDetailsClick = useCallback((tableId) => {
+        if (currentModel && currentModel.join && currentModel.join[tableId]) {
+            setJoinDetails({
+                tableId,
+                joins: currentModel.join[tableId],
+            });
+        }
+    }, [currentModel]);
+
     const decoratedNodes = useNodeDecoration(
         nodes,
         edges,
@@ -131,7 +143,8 @@ const IndividualSQLView = () => {
         handleLabelChange,
         handleAliasChange,
         handleEditClick,
-        handleDeleteTable
+        handleDeleteTable,
+        handleJoinDetailsClick
     );
 
     const decoratedEdges = useEdgeFiltering(
@@ -173,6 +186,7 @@ const IndividualSQLView = () => {
     const onExport = useCallback(async () => {
         try {
             const model = flowToModel(nodes, edges);
+            setCurrentModel(model);
             const jsonString = JSON.stringify(model, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
 
@@ -227,6 +241,7 @@ const IndividualSQLView = () => {
                     await setCurrentFile(fileId);
                     try {
                         const { nodes: importedNodes, edges: importedEdges } = modelToFlow(file.data);
+                        setCurrentModel(file.data);
                         setNodes(importedNodes);
                         setEdges(importedEdges);
                         setEditingNode(null);
@@ -469,6 +484,13 @@ const IndividualSQLView = () => {
                     setHighlightedEdges(new Set());
                 }}
                 onUpdateCalculation={handleUpdateFieldCalculation}
+            />
+
+            <JoinDetailsDrawer
+                selectedTable={joinDetails?.tableId}
+                joins={joinDetails?.joins}
+                onClose={() => setJoinDetails(null)}
+                allNodes={nodes}
             />
         </div>
     );

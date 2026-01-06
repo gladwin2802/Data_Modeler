@@ -1422,6 +1422,7 @@
       },
       {
         "from": {
+          "field": "RUNTIME.CALCUTION",
           "calculation": "DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY)"
         },
         "to": {
@@ -1454,6 +1455,7 @@
           "field": "CTE_Vendors.AccountNumberOfVendorOrCreditor_LIFNR"
         },
         "to": {
+          "field": "BASE_VendorConfig.NameOfVariantVariable_NAME",
           "calculation": "ARRAY_REVERSE(SPLIT(VendorConfig.NameOfVariantVariable_NAME, '_'))[SAFE_OFFSET(0)]"
         },
         "type": "LEFT"
@@ -1499,6 +1501,7 @@
           "field": "CTE_AccountingInvoicesKPI.ObjectKey_AWKEY"
         },
         "to": {
+          "field": "BASE_PurchaseDocumentsHistory.NumberOfMaterialDocument_BELNR||BASE_PurchaseDocumentsHistory.MaterialDocumentYear_GJAHR",
           "calculation": "CONCAT(POOrderHistory.NumberOfMaterialDocument_BELNR, POOrderHistory.MaterialDocumentYear_GJAHR)"
         },
         "type": "LEFT"

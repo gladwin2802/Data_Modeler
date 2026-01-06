@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Handle, Position } from "reactflow";
 import { FiEdit3, FiTrash2 } from "react-icons/fi";
 import TableNodeFieldEditor from "./TableNodeFieldEditor";
@@ -19,6 +20,7 @@ const TableNodeField = ({
     onDeleteFieldRef,
 }) => {
     const isEditing = editingField === field.name;
+    const [showCalculation, setShowCalculation] = useState(false);
     // Use nodeId (which contains the full prefixed entity name) when
     // constructing handle ids so they match imported edges.
     const nodeId = data.nodeId || data.label;

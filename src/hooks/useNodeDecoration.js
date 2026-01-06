@@ -39,7 +39,8 @@ export const useNodeDecoration = (
     handleLabelChange,
     handleAliasChange,
     handleEditClick,
-    handleDeleteTable
+    handleDeleteTable,
+    handleJoinDetailsClick
 ) => {
     const decoratedNodes = useMemo(() => {
         return nodes.map((n) => ({
@@ -78,6 +79,7 @@ export const useNodeDecoration = (
                     (e) => e.source === n.id || e.target === n.id
                 ),
                 onDeleteTable: () => handleDeleteTable(n.id),
+                onJoinDetailsClick: () => handleJoinDetailsClick(n.id),
             },
         }));
     }, [
@@ -99,6 +101,7 @@ export const useNodeDecoration = (
         handleAliasChange,
         handleEditClick,
         handleDeleteTable,
+        handleJoinDetailsClick,
     ]);
 
     return decoratedNodes;

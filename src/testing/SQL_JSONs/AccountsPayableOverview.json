@@ -412,7 +412,7 @@
           "field": "BASE_AccountsPayable.Client_MANDT"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.Client_MANDT"
+          "field": "BASE_AccountsPayableTurnover.Client_MANDT"
         },
         "type": "LEFT"
       },
@@ -421,7 +421,7 @@
           "field": "BASE_AccountsPayable.CompanyCode_BUKRS"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.CompanyCode_BUKRS"
+          "field": "BASE_AccountsPayableTurnover.CompanyCode_BUKRS"
         },
         "type": "LEFT"
       },
@@ -430,7 +430,7 @@
           "field": "BASE_AccountsPayable.AccountNumberOfVendorOrCreditor_LIFNR"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.AccountNumberOfVendorOrCreditor_LIFNR"
+          "field": "BASE_AccountsPayableTurnover.AccountNumberOfVendorOrCreditor_LIFNR"
         },
         "type": "LEFT"
       },
@@ -439,7 +439,7 @@
           "field": "BASE_AccountsPayable.AccountingDocumentNumber_BELNR"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.AccountingDocumentNumber_BELNR"
+          "field": "BASE_AccountsPayableTurnover.AccountingDocumentNumber_BELNR"
         },
         "type": "LEFT"
       },
@@ -448,7 +448,7 @@
           "field": "BASE_AccountsPayable.TargetCurrency_TCURR"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.TargetCurrency_TCURR"
+          "field": "BASE_AccountsPayableTurnover.TargetCurrency_TCURR"
         },
         "type": "LEFT"
       },
@@ -457,7 +457,7 @@
           "field": "BASE_AccountsPayable.DocFiscPeriod"
         },
         "to": {
-          "field": "CTE_AccountsPayableTurnover.DocFiscPeriod"
+          "field": "BASE_AccountsPayableTurnover.DocFiscPeriod"
         },
         "type": "LEFT"
       },

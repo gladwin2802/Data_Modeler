@@ -72,6 +72,7 @@ const TableNode = ({ data }) => {
                 data={data} 
                 onEditClick={data.onEditClick}
                 onDeleteClick={data.onDeleteTable}
+                onJoinDetailsClick={data.onJoinDetailsClick}
             />
 
             {/* Field List */}
