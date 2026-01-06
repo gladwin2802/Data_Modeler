@@ -109,8 +109,10 @@ const TableNodeField = ({
                 }}
                 onClick={(e) => {
                     if (!data.isEditing && !isEditing) {
+                        // console.log("onFieldClick called with:", field);
                         onFieldClick?.(field.name, field);
                     }
+                    // console.log("isEditing:", isEditing, "data.isEditing:" , data.isEditing);
                 }}
             >
                 {isEditing ? (

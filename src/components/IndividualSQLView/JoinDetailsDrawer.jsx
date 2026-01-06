@@ -3,6 +3,7 @@ import { FiX, FiLink2 } from "react-icons/fi";
 import ReactFlow, { Controls, Background } from "reactflow";
 import "reactflow/dist/style.css";
 import TableNode from "./TableNode/TableNode";
+import FieldCalculationPopup from "./FieldCalculationPopup";
 
 /**
  * Drawer component for displaying join details with visual representation
@@ -11,9 +12,67 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
     const [drawerWidth, setDrawerWidth] = useState(600);
     const [isResizing, setIsResizing] = useState(false);
     const [selectedJoinIndex, setSelectedJoinIndex] = useState(0);
+    const [showCalculationPopup, setShowCalculationPopup] = useState(false);
+    const [selectedField, setSelectedField] = useState(null);
     const drawerRef = useRef(null);
 
     const nodeTypes = useMemo(() => ({ tableNode: TableNode }), []);
+
+    // Handle field click to show calculation popup
+    const handleFieldClick = (fieldName, field, nodeTableName) => {
+        // Look for calculation data in join conditions
+        let calculationData = null;
+        let matchingJoin = null;
+        
+        // Search through all join groups to find this field
+        for (let groupIndex = 0; groupIndex < joinGroups.length; groupIndex++) {
+            const group = joinGroups[groupIndex];
+            
+            for (let joinIndex = 0; joinIndex < group.joins.length; joinIndex++) {
+                const join = group.joins[joinIndex];
+                
+                // Extract field names from the join condition
+                const fromFieldStr = join.from?.field || join.from?.calculation || "";
+                const toFieldStr = join.to?.field || join.to?.calculation || "";
+                
+                // Extract just the field name (after the table name)
+                const fromFieldName = fromFieldStr.includes(".") 
+                    ? fromFieldStr.split(".").slice(1).join(".")
+                    : fromFieldStr;
+                const toFieldName = toFieldStr.includes(".") 
+                    ? toFieldStr.split(".").slice(1).join(".")
+                    : toFieldStr;
+                
+                // Check if this field matches either side of the join
+                if (fromFieldName === fieldName || toFieldName === fieldName) {
+                    matchingJoin = join;
+                    
+                    // Determine which side was clicked and get the appropriate calculation
+                    const isFromField = fromFieldName === fieldName;
+                    const clickedSide = isFromField ? join.from : join.to;
+                    calculationData = clickedSide.calculation;
+                    
+                    // Create a field object with the calculation data for the popup
+                    const fieldWithCalculation = {
+                        name: fieldName,
+                        calculation: calculationData,
+                        joinSource: {
+                            type: join.type,
+                            from: join.from,
+                            to: join.to,
+                            originalIndex: joinIndex,
+                            clickedSide: isFromField ? 'from' : 'to'
+                        }
+                    };
+                    if (calculationData !== null && calculationData !== undefined) {
+                        setSelectedField(fieldWithCalculation);
+                        setShowCalculationPopup(true);
+                        return;
+                    }
+                }
+            }
+        }
+    };
 
     const handleResizeStart = (e) => {
         setIsResizing(true);
@@ -166,7 +225,8 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
         
         if (fromNodeData) {
             // Filter and sort fields to match join order
-            const filteredFields = (fromNodeData.data?.fields || []).filter((field) => 
+            const originalFields = fromNodeData.data?.fields || [];
+            const filteredFields = originalFields.filter((field) => 
                 fromFieldNamesSet.has(field.name) || fromFieldNamesSet.has(field.label)
             );
             
@@ -187,6 +247,8 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
                     isEditing: false,
                     selectedField: null,
                     fields: sortedFields.length > 0 ? sortedFields : fromNodeData.data?.fields || [],
+                    onFieldClick: (fieldName, field) => handleFieldClick(fieldName, field, fromNodeData.data?.label || joinInfo.fromInfo.table),
+                    tableName: fromNodeData.data?.label || joinInfo.fromInfo.table,
                 },
                 position: { x: 0, y: 0 },
                 type: "tableNode",
@@ -201,7 +263,9 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
             
             if (!isSameNode) {
                 // Filter and sort fields to match join order
-                const filteredFields = (toNodeData.data?.fields || []).filter((field) => 
+                const originalFields = toNodeData.data?.fields || [];
+                
+                const filteredFields = originalFields.filter((field) => 
                     toFieldNamesSet.has(field.name) || toFieldNamesSet.has(field.label)
                 );
                 
@@ -222,6 +286,8 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
                         isEditing: false,
                         selectedField: null,
                         fields: sortedFields.length > 0 ? sortedFields : toNodeData.data?.fields || [],
+                        onFieldClick: (fieldName, field) => handleFieldClick(fieldName, field, toNodeData.data?.label || joinInfo.toInfo.table),
+                        tableName: toNodeData.data?.label || joinInfo.toInfo.table,
                     },
                     position: { x: 400, y: 0 },
                     type: "tableNode",
@@ -343,334 +409,349 @@ const JoinDetailsDrawer = ({ selectedTable, joins, onClose, allNodes = [] }) => 
     });
 
     return (
-        <div
-            ref={drawerRef}
-            style={{
-                width: `${drawerWidth}px`,
-                background: "linear-gradient(180deg, #ffffff 0%, #f9fafb 100%)",
-                borderLeft: "2px solid #e5e7eb",
-                boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.15)",
-                padding: "24px",
-                overflowY: "auto",
-                transition: isResizing ? "none" : "transform 300ms ease",
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                maxHeight: "100vh",
-            }}
-        >
-            {/* Header */}
+        <>
             <div
+                ref={drawerRef}
                 style={{
+                    width: `${drawerWidth}px`,
+                    background: "linear-gradient(180deg, #ffffff 0%, #f9fafb 100%)",
+                    borderLeft: "2px solid #e5e7eb",
+                    boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.15)",
+                    padding: "24px",
+                    overflowY: "auto",
+                    transition: isResizing ? "none" : "transform 300ms ease",
+                    position: "relative",
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "24px",
-                    paddingBottom: "18px",
-                    borderBottom: "2px solid #e5e7eb",
+                    flexDirection: "column",
+                    maxHeight: "100vh",
                 }}
             >
-                <h3 style={{ 
-                    margin: 0, 
-                    color: "#111827",
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                }}>
-                    <FiLink2 size={20} />
-                    Join Details
-                </h3>
-                <div style={{ position: "relative" }}>
-                    <button
-                        onClick={onClose}
-                        style={{ 
-                            cursor: "pointer",
-                            background: "#ef4444",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: "50%",
-                            width: "28px",
-                            height: "28px",
-                            fontSize: "16px",
-                            fontWeight: "bold",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "all 150ms ease",
-                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.background = "#dc2626";
-                            e.target.style.transform = "scale(1.1) rotate(90deg)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.background = "#ef4444";
-                            e.target.style.transform = "scale(1) rotate(0deg)";
-                        }}
-                    >
-                        <FiX size={16} />
-                    </button>
+                {/* Header */}
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "24px",
+                        paddingBottom: "18px",
+                        borderBottom: "2px solid #e5e7eb",
+                    }}
+                >
+                    <h3 style={{ 
+                        margin: 0, 
+                        color: "#111827",
+                        fontSize: "20px",
+                        fontWeight: 600,
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                    }}>
+                        <FiLink2 size={20} />
+                        Join Details
+                    </h3>
+                    <div style={{ position: "relative" }}>
+                        <button
+                            onClick={onClose}
+                            style={{ 
+                                cursor: "pointer",
+                                background: "#ef4444",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "50%",
+                                width: "28px",
+                                height: "28px",
+                                fontSize: "16px",
+                                fontWeight: "bold",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "all 150ms ease",
+                                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = "#dc2626";
+                                e.target.style.transform = "scale(1.1) rotate(90deg)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = "#ef4444";
+                                e.target.style.transform = "scale(1) rotate(0deg)";
+                            }}
+                        >
+                            <FiX size={16} />
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Join Navigation */}
-            {joinGroups.length > 1 && (
-                <div style={{
-                    marginBottom: "16px",
-                    display: "flex",
-                    gap: "8px",
-                    alignItems: "center",
-                }}>
-                    <button
-                        onClick={() => setSelectedJoinIndex(Math.max(0, selectedJoinIndex - 1))}
-                        disabled={selectedJoinIndex === 0}
-                        style={{
-                            padding: "6px 12px",
-                            background: selectedJoinIndex === 0 ? "#e5e7eb" : "#3b82f6",
-                            color: selectedJoinIndex === 0 ? "#9ca3af" : "#fff",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: selectedJoinIndex === 0 ? "not-allowed" : "pointer",
+                {/* Join Navigation */}
+                {joinGroups.length > 1 && (
+                    <div style={{
+                        marginBottom: "16px",
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                    }}>
+                        <button
+                            onClick={() => setSelectedJoinIndex(Math.max(0, selectedJoinIndex - 1))}
+                            disabled={selectedJoinIndex === 0}
+                            style={{
+                                padding: "6px 12px",
+                                background: selectedJoinIndex === 0 ? "#e5e7eb" : "#3b82f6",
+                                color: selectedJoinIndex === 0 ? "#9ca3af" : "#fff",
+                                border: "none",
+                                borderRadius: "6px",
+                                cursor: selectedJoinIndex === 0 ? "not-allowed" : "pointer",
+                                fontWeight: 600,
+                                fontSize: "12px",
+                            }}
+                        >
+                            ← Previous
+                        </button>
+                        <div style={{
+                            flex: 1,
+                            textAlign: "center",
+                            fontSize: "13px",
                             fontWeight: 600,
-                            fontSize: "12px",
-                        }}
-                    >
-                        ← Previous
-                    </button>
+                            color: "#6b7280",
+                        }}>
+                            Group {selectedJoinIndex + 1} of {joinGroups.length}
+                        </div>
+                        <button
+                            onClick={() => setSelectedJoinIndex(Math.min(joinGroups.length - 1, selectedJoinIndex + 1))}
+                            disabled={selectedJoinIndex === joinGroups.length - 1}
+                            style={{
+                                padding: "6px 12px",
+                                background: selectedJoinIndex === joinGroups.length - 1 ? "#e5e7eb" : "#3b82f6",
+                                color: selectedJoinIndex === joinGroups.length - 1 ? "#9ca3af" : "#fff",
+                                border: "none",
+                                borderRadius: "6px",
+                                cursor: selectedJoinIndex === joinGroups.length - 1 ? "not-allowed" : "pointer",
+                                fontWeight: 600,
+                                fontSize: "12px",
+                            }}
+                        >
+                            Next →
+                        </button>
+                    </div>
+                )}
+
+                {/* ReactFlow Canvas */}
+                {flowNodes.length > 0 && (
                     <div style={{
                         flex: 1,
-                        textAlign: "center",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        color: "#6b7280",
+                        marginBottom: "16px",
+                        border: `2px solid ${colors.border}`,
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                        minHeight: "350px",
+                        background: "#fff",
                     }}>
-                        Group {selectedJoinIndex + 1} of {joinGroups.length}
+                        <ReactFlow
+                            nodes={flowNodes}
+                            edges={flowEdges}
+                            nodeTypes={nodeTypes}
+                            minZoom={0.3}
+                            maxZoom={1.5}
+                            defaultEdgeOptions={{
+                                animated: true,
+                            }}
+                            fitView
+                        >
+                            <Background gap={16} />
+                            <Controls />
+                        </ReactFlow>
                     </div>
-                    <button
-                        onClick={() => setSelectedJoinIndex(Math.min(joinGroups.length - 1, selectedJoinIndex + 1))}
-                        disabled={selectedJoinIndex === joinGroups.length - 1}
-                        style={{
-                            padding: "6px 12px",
-                            background: selectedJoinIndex === joinGroups.length - 1 ? "#e5e7eb" : "#3b82f6",
-                            color: selectedJoinIndex === joinGroups.length - 1 ? "#9ca3af" : "#fff",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: selectedJoinIndex === joinGroups.length - 1 ? "not-allowed" : "pointer",
-                            fontWeight: 600,
-                            fontSize: "12px",
-                        }}
-                    >
-                        Next →
-                    </button>
-                </div>
-            )}
+                )}
 
-            {/* ReactFlow Canvas */}
-            {flowNodes.length > 0 && (
-                <div style={{
-                    flex: 1,
-                    marginBottom: "16px",
-                    border: `2px solid ${colors.border}`,
-                    borderRadius: "10px",
-                    overflow: "hidden",
-                    minHeight: "350px",
-                    background: "#fff",
-                }}>
-                    <ReactFlow
-                        nodes={flowNodes}
-                        edges={flowEdges}
-                        nodeTypes={nodeTypes}
-                        minZoom={0.3}
-                        maxZoom={1.5}
-                        defaultEdgeOptions={{
-                            animated: true,
-                        }}
-                        fitView
-                    >
-                        <Background gap={16} />
-                        <Controls />
-                    </ReactFlow>
-                </div>
-            )}
-
-            {/* Summary */}
-            {flowNodes.length > 0 && (
-                <div style={{
-                    padding: "12px 16px",
-                    background: "#f3f4f6",
-                    borderRadius: 8,
-                    border: "1px solid #e5e7eb",
-                    marginBottom: "16px",
-                }}>
+                {/* Summary */}
+                {flowNodes.length > 0 && (
                     <div style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
+                        padding: "12px 16px",
+                        background: "#f3f4f6",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        marginBottom: "16px",
                     }}>
-                        <span style={{ fontWeight: 600 }}>Connection Summary:</span> {currentGroup.joins.length} field{currentGroup.joins.length !== 1 ? 's' : ''} connected with <span style={{ color: colors.border, fontWeight: 600 }}>{currentGroup.joinType?.toUpperCase() || "INNER"}</span> join
-                    </div>
-                </div>
-            )}
-
-            {/* Join Condition Details */}
-            <div style={{
-                padding: "16px",
-                background: colors.bg,
-                borderRadius: 10,
-                border: `2px solid ${colors.border}`,
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
-            }}>
-                {/* Join Type Badge */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "12px" }}>
-                    <span
-                        style={{
-                            display: "inline-block",
-                            padding: "4px 10px",
-                            background: colors.border,
-                            color: "#fff",
-                            borderRadius: "4px",
+                        <div style={{
                             fontSize: "12px",
-                            fontWeight: 600,
-                        }}
-                    >
-                        {currentGroup.joinType?.toUpperCase() || "INNER"}
-                    </span>
-                    <span style={{ fontSize: "12px", color: colors.text, fontWeight: 500 }}>
-                        Join Conditions ({groupJoinConditions.length})
-                    </span>
+                            color: "#6b7280",
+                        }}>
+                            <span style={{ fontWeight: 600 }}>Connection Summary:</span> {currentGroup.joins.length} field{currentGroup.joins.length !== 1 ? 's' : ''} connected with <span style={{ color: colors.border, fontWeight: 600 }}>{currentGroup.joinType?.toUpperCase() || "INNER"}</span> join
+                        </div>
+                    </div>
+                )}
+
+                {/* Join Condition Details */}
+                <div style={{
+                    padding: "16px",
+                    background: colors.bg,
+                    borderRadius: 10,
+                    border: `2px solid ${colors.border}`,
+                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                }}>
+                    {/* Join Type Badge */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "12px" }}>
+                        <span
+                            style={{
+                                display: "inline-block",
+                                padding: "4px 10px",
+                                background: colors.border,
+                                color: "#fff",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                            }}
+                        >
+                            {currentGroup.joinType?.toUpperCase() || "INNER"}
+                        </span>
+                        <span style={{ fontSize: "12px", color: colors.text, fontWeight: 500 }}>
+                            Join Conditions ({groupJoinConditions.length})
+                        </span>
+                    </div>
+
+                    {/* Display all join conditions in the group */}
+                    {groupJoinConditions.map((condition, idx) => {
+                        // Get the actual join object to access calculation
+                        const actualJoin = currentGroup.joins?.[idx];
+                        const fromCalculation = actualJoin?.from?.calculation;
+                        const toCalculation = actualJoin?.to?.calculation;
+                        
+                        return (
+                        <div key={idx} style={{ marginBottom: idx < groupJoinConditions.length - 1 ? "16px" : 0 }}>
+                            {/* Condition number */}
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: colors.text, marginBottom: "8px" }}>
+                                Condition {idx + 1}
+                            </div>
+
+                            {/* From Condition */}
+                            <div style={{ marginBottom: "8px" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: colors.text, marginBottom: "3px" }}>
+                                    FROM
+                                </div>
+                                <div
+                                    style={{
+                                        padding: "6px",
+                                        background: "#fff",
+                                        borderRadius: "4px",
+                                        border: `1px solid ${colors.border}`,
+                                        fontSize: "11px",
+                                        fontFamily: "'Fira Code', 'Courier New', monospace",
+                                        color: "#374151",
+                                        overflowWrap: "break-word",
+                                        wordBreak: "break-word",
+                                        whiteSpace: "pre-wrap",
+                                        cursor: fromCalculation ? "help" : "default",
+                                        position: "relative",
+                                    }}
+                                    title={fromCalculation ? `Calculation: ${fromCalculation}` : condition.fromField}
+                                >
+                                    {condition.fromField}
+                                    {fromCalculation && (
+                                        <div style={{
+                                            fontSize: "9px",
+                                            color: "#6b7280",
+                                            marginTop: "4px",
+                                            paddingTop: "4px",
+                                            borderTop: "1px solid #e5e7eb",
+                                            fontStyle: "italic",
+                                        }}>
+                                            📝 Has calculation
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Arrow */}
+                            <div style={{ textAlign: "center", margin: "4px 0", fontSize: "10px", color: colors.text, fontWeight: 600 }}>
+                                ↓
+                            </div>
+
+                            {/* To Condition */}
+                            <div>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: colors.text, marginBottom: "3px" }}>
+                                    TO
+                                </div>
+                                <div
+                                    style={{
+                                        padding: "6px",
+                                        background: "#fff",
+                                        borderRadius: "4px",
+                                        border: `1px solid ${colors.border}`,
+                                        fontSize: "11px",
+                                        fontFamily: "'Fira Code', 'Courier New', monospace",
+                                        color: "#374151",
+                                        overflowWrap: "break-word",
+                                        wordBreak: "break-word",
+                                        whiteSpace: "pre-wrap",
+                                        cursor: toCalculation ? "help" : "default",
+                                        position: "relative",
+                                    }}
+                                    title={toCalculation ? `Calculation: ${toCalculation}` : condition.toField}
+                                >
+                                    {condition.toField}
+                                    {toCalculation && (
+                                        <div style={{
+                                            fontSize: "9px",
+                                            color: "#6b7280",
+                                            marginTop: "4px",
+                                            paddingTop: "4px",
+                                            borderTop: "1px solid #e5e7eb",
+                                            fontStyle: "italic",
+                                        }}>
+                                            📝 Has calculation
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Divider between conditions */}
+                            {idx < groupJoinConditions.length - 1 && (
+                                <div style={{ margin: "12px 0", borderTop: "1px dashed #d1d5db" }} />
+                            )}
+                        </div>
+                        );
+                    })}
                 </div>
 
-                {/* Display all join conditions in the group */}
-                {groupJoinConditions.map((condition, idx) => {
-                    // Get the actual join object to access calculation
-                    const actualJoin = currentGroup.joins?.[idx];
-                    const fromCalculation = actualJoin?.from?.calculation;
-                    const toCalculation = actualJoin?.to?.calculation;
-                    
-                    return (
-                    <div key={idx} style={{ marginBottom: idx < groupJoinConditions.length - 1 ? "16px" : 0 }}>
-                        {/* Condition number */}
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: colors.text, marginBottom: "8px" }}>
-                            Condition {idx + 1}
-                        </div>
-
-                        {/* From Condition */}
-                        <div style={{ marginBottom: "8px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 600, color: colors.text, marginBottom: "3px" }}>
-                                FROM
-                            </div>
-                            <div
-                                style={{
-                                    padding: "6px",
-                                    background: "#fff",
-                                    borderRadius: "4px",
-                                    border: `1px solid ${colors.border}`,
-                                    fontSize: "11px",
-                                    fontFamily: "'Fira Code', 'Courier New', monospace",
-                                    color: "#374151",
-                                    overflowWrap: "break-word",
-                                    wordBreak: "break-word",
-                                    whiteSpace: "pre-wrap",
-                                    cursor: fromCalculation ? "help" : "default",
-                                    position: "relative",
-                                }}
-                                title={fromCalculation ? `Calculation: ${fromCalculation}` : condition.fromField}
-                            >
-                                {condition.fromField}
-                                {fromCalculation && (
-                                    <div style={{
-                                        fontSize: "9px",
-                                        color: "#6b7280",
-                                        marginTop: "4px",
-                                        paddingTop: "4px",
-                                        borderTop: "1px solid #e5e7eb",
-                                        fontStyle: "italic",
-                                    }}>
-                                        📝 Has calculation
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Arrow */}
-                        <div style={{ textAlign: "center", margin: "4px 0", fontSize: "10px", color: colors.text, fontWeight: 600 }}>
-                            ↓
-                        </div>
-
-                        {/* To Condition */}
-                        <div>
-                            <div style={{ fontSize: "10px", fontWeight: 600, color: colors.text, marginBottom: "3px" }}>
-                                TO
-                            </div>
-                            <div
-                                style={{
-                                    padding: "6px",
-                                    background: "#fff",
-                                    borderRadius: "4px",
-                                    border: `1px solid ${colors.border}`,
-                                    fontSize: "11px",
-                                    fontFamily: "'Fira Code', 'Courier New', monospace",
-                                    color: "#374151",
-                                    overflowWrap: "break-word",
-                                    wordBreak: "break-word",
-                                    whiteSpace: "pre-wrap",
-                                    cursor: toCalculation ? "help" : "default",
-                                    position: "relative",
-                                }}
-                                title={toCalculation ? `Calculation: ${toCalculation}` : condition.toField}
-                            >
-                                {condition.toField}
-                                {toCalculation && (
-                                    <div style={{
-                                        fontSize: "9px",
-                                        color: "#6b7280",
-                                        marginTop: "4px",
-                                        paddingTop: "4px",
-                                        borderTop: "1px solid #e5e7eb",
-                                        fontStyle: "italic",
-                                    }}>
-                                        📝 Has calculation
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Divider between conditions */}
-                        {idx < groupJoinConditions.length - 1 && (
-                            <div style={{ margin: "12px 0", borderTop: "1px dashed #d1d5db" }} />
-                        )}
-                    </div>
-                    );
-                })}
+                {/* Resize Handle */}
+                <div
+                    onMouseDown={handleResizeStart}
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "4px",
+                        height: "100%",
+                        cursor: "col-resize",
+                        backgroundColor: isResizing ? "#10b981" : "#d1d5db",
+                        transition: "backgroundColor 150ms ease",
+                        userSelect: "none",
+                    }}
+                    onMouseEnter={(e) => {
+                        if (!isResizing) e.target.style.backgroundColor = "#10b981";
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!isResizing) e.target.style.backgroundColor = "#d1d5db";
+                    }}
+                />
             </div>
 
-            {/* Resize Handle */}
-            <div
-                onMouseDown={handleResizeStart}
-                style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "4px",
-                    height: "100%",
-                    cursor: "col-resize",
-                    backgroundColor: isResizing ? "#10b981" : "#d1d5db",
-                    transition: "backgroundColor 150ms ease",
-                    userSelect: "none",
-                }}
-                onMouseEnter={(e) => {
-                    if (!isResizing) e.target.style.backgroundColor = "#10b981";
-                }}
-                onMouseLeave={(e) => {
-                    if (!isResizing) e.target.style.backgroundColor = "#d1d5db";
-                }}
-            />
-        </div>
+            {/* Field Calculation Popup */}
+            {showCalculationPopup && selectedField && (
+                <FieldCalculationPopup
+                    field={selectedField}
+                    onClose={() => {
+                        setShowCalculationPopup(false);
+                        setSelectedField(null);
+                    }}
+                />
+            )}
+        </>
     );
+
+    return null;
 };
 
 export default JoinDetailsDrawer;
