@@ -1,5 +1,5 @@
 const DB_NAME = 'sql_data_model_db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_META = 'metadata';
 const CURRENT_FILE_KEY = 'current_file';
 const DIRECTORY_HANDLE_KEY = 'directory_handle';
@@ -38,7 +38,7 @@ function openDB() {
             }
             
             const modelerTypes = ['sql', 'pipeline'];
-            const fileTypes = ['individual', 'consolidated'];
+            const fileTypes = ['individual', 'consolidated', 'data_products'];
             
             modelerTypes.forEach(modelerType => {
                 fileTypes.forEach(fileType => {
@@ -46,7 +46,7 @@ function openDB() {
                     if (!database.objectStoreNames.contains(storeName)) {
                         const store = database.createObjectStore(storeName, { keyPath: 'id' });
                         store.createIndex('name', 'name', { unique: true });
-                    } else if (event.oldVersion < 4) {
+                    } else if (event.oldVersion < 5) {
                         const transaction = event.target.transaction;
                         const store = transaction.objectStore(storeName);
                         if (!store.indexNames.contains('name')) {
@@ -57,7 +57,7 @@ function openDB() {
             });
             
             if (event.oldVersion < 3) {
-                const oldStores = ['files', 'merged_files'];
+                const oldStores = ['files', 'merged_files', 'data_products'];
                 oldStores.forEach(storeName => {
                     if (database.objectStoreNames.contains(storeName)) {
                         database.deleteObjectStore(storeName);
@@ -145,7 +145,7 @@ export async function selectStorageDirectory() {
 
 async function createRequiredFolders(directoryHandle) {
     const modelerTypes = ['sql', 'pipeline'];
-    const fileTypes = ['individual', 'consolidated'];
+    const fileTypes = ['individual', 'consolidated', 'data_products'];
     
     for (const modelerType of modelerTypes) {
         for (const fileType of fileTypes) {
@@ -161,7 +161,7 @@ async function createRequiredFolders(directoryHandle) {
 
 async function syncAllFilesFromDirectory(directoryHandle) {
     const modelerTypes = ['sql', 'pipeline'];
-    const fileTypes = ['individual', 'consolidated'];
+    const fileTypes = ['individual', 'consolidated', 'data_products'];
     
     for (const modelerType of modelerTypes) {
         for (const fileType of fileTypes) {
@@ -171,10 +171,10 @@ async function syncAllFilesFromDirectory(directoryHandle) {
 }
 
 async function syncFilesFromFolder(directoryHandle, modelerType, fileType) {
+    const folderName = getFolderName(modelerType, fileType);
     try {
         const database = await openDB();
         const storeName = getStoreName(modelerType, fileType);
-        const folderName = getFolderName(modelerType, fileType);
         
         const existingFiles = await new Promise((resolve, reject) => {
             const transaction = database.transaction([storeName], 'readonly');
@@ -700,4 +700,267 @@ export async function syncFilesFromDirectory() {
 
 export async function getStorageDirectoryWithSync() {
     return await getDirectoryHandle(true);
+}
+
+export async function getAllDataProducts(modelerType = 'sql') {
+    try {
+        const database = await openDB();
+        const storeName = getStoreName(modelerType, 'data_products');
+        
+        if (!database.objectStoreNames.contains(storeName)) {
+            return [];
+        }
+        
+        const transaction = database.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (error) {
+        console.error('Error getting all data products from storage:', error);
+        return [];
+    }
+}
+
+function sanitizeForIndexedDB(obj) {
+    const seen = new WeakMap();
+    function walk(value) {
+        if (value === null) return null;
+        const t = typeof value;
+        if (t === 'function') return undefined;
+        if (t !== 'object') return value;
+        if (value instanceof Date) return value.toISOString();
+        if (seen.has(value)) return '[Circular]';
+        seen.set(value, true);
+        if (Array.isArray(value)) {
+            const arr = [];
+            for (const item of value) {
+                const v = walk(item);
+                arr.push(v === undefined ? null : v);
+            }
+            return arr;
+        }
+        const out = {};
+        for (const [k, v] of Object.entries(value)) {
+            const w = walk(v);
+            if (w !== undefined) out[k] = w;
+        }
+        return out;
+    }
+    return walk(obj);
+}
+
+export async function saveDataProduct(fileName, fileData, existingFileId = null, modelerType = 'sql') {
+    try {
+        let handle = await getDirectoryHandle();
+        if (!handle) {
+            handle = await selectStorageDirectory();
+            if (!handle) {
+                throw new Error('No storage directory selected');
+            }
+        }
+
+        const folderName = getFolderName(modelerType, 'data_products');
+        const dataProductsFolderHandle = await handle.getDirectoryHandle(folderName, { create: true });
+
+        const allProducts = await getAllDataProducts(modelerType);
+        
+        if (!existingFileId) {
+            const duplicate = allProducts.find(p => p.name === fileName);
+            if (duplicate) {
+                throw new Error(`A data product with the name "${fileName}" already exists`);
+            }
+        }
+
+        let existingProduct = null;
+        if (existingFileId) {
+            existingProduct = allProducts.find(p => p.id === existingFileId);
+        }
+
+        const fileHandle = await dataProductsFolderHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(fileData, null, 2));
+        await writable.close();
+
+        const sanitizedData = sanitizeForIndexedDB(fileData);
+
+        const database = await openDB();
+        const storeName = getStoreName(modelerType, 'data_products');
+        
+        if (!database.objectStoreNames.contains(storeName)) {
+            await new Promise((resolve, reject) => {
+                database.close();
+                const request = indexedDB.open(DB_NAME, DB_VERSION + 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                request.onupgradeneeded = (event) => {
+                    const database = event.target.result;
+                    if (!database.objectStoreNames.contains(storeName)) {
+                        database.createObjectStore(storeName, { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+
+        const transaction = database.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+
+        if (existingFileId && existingProduct) {
+            const updatedEntry = {
+                ...existingProduct,
+                name: fileName,
+                updatedAt: new Date().toISOString(),
+                data: sanitizedData,
+            };
+            store.put(updatedEntry);
+            
+            await new Promise((resolve, reject) => {
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            });
+            
+            return updatedEntry;
+        } else {
+            const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            const fileEntry = {
+                id: fileId,
+                name: fileName,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                data: sanitizedData,
+            };
+            store.add(fileEntry);
+            
+            await new Promise((resolve, reject) => {
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            });
+            
+            return fileEntry;
+        }
+    } catch (error) {
+        console.error('Error saving data product to storage:', error);
+        throw error;
+    }
+}
+
+export async function getDataProduct(fileId, modelerType = 'sql') {
+    try {
+        const dataProducts = await getAllDataProducts(modelerType);
+        const dataProduct = dataProducts.find(f => f.id === fileId);
+        if (!dataProduct) return null;
+
+        const handle = await getDirectoryHandle();
+        if (!handle) {
+            if (dataProduct.data) {
+                return dataProduct;
+            }
+            throw new Error('No storage directory available');
+        }
+
+        try {
+            const folderName = getFolderName(modelerType, 'data_products');
+            const dataProductsFolderHandle = await handle.getDirectoryHandle(folderName);
+            const fileHandle = await dataProductsFolderHandle.getFileHandle(dataProduct.name);
+            const fileObj = await fileHandle.getFile();
+            const text = await fileObj.text();
+            const data = JSON.parse(text);
+
+            return {
+                ...dataProduct,
+                data: data
+            };
+        } catch (error) {
+            if (dataProduct.data) {
+                return dataProduct;
+            }
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error getting data product from storage:', error);
+        return null;
+    }
+}
+
+export async function renameDataProduct(fileId, newFileName, modelerType = 'sql') {
+    try {
+        const dataProduct = await getDataProduct(fileId, modelerType);
+        if (!dataProduct) return false;
+
+        if (dataProduct.name === newFileName) return true;
+
+        const handle = await getDirectoryHandle();
+        if (!handle) {
+            throw new Error('No storage directory available');
+        }
+
+        const folderName = getFolderName(modelerType, 'data_products');
+        const dataProductsFolderHandle = await handle.getDirectoryHandle(folderName);
+        const oldFileHandle = await dataProductsFolderHandle.getFileHandle(dataProduct.name);
+        const fileObj = await oldFileHandle.getFile();
+        const text = await fileObj.text();
+
+        const newFileHandle = await dataProductsFolderHandle.getFileHandle(newFileName, { create: true });
+        const writable = await newFileHandle.createWritable();
+        await writable.write(text);
+        await writable.close();
+
+        try {
+            await dataProductsFolderHandle.removeEntry(dataProduct.name);
+        } catch (error) {
+            console.warn('Error removing old data product file:', error);
+        }
+
+        const updatedFileEntry = {
+            ...dataProduct,
+            name: newFileName,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const database = await openDB();
+        const storeName = getStoreName(modelerType, 'data_products');
+        const transaction = database.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        store.put(updatedFileEntry);
+
+        return true;
+    } catch (error) {
+        console.error('Error renaming data product:', error);
+        return false;
+    }
+}
+
+export async function deleteDataProduct(fileId, modelerType = 'sql') {
+    try {
+        const dataProduct = await getDataProduct(fileId, modelerType);
+        if (dataProduct) {
+            const handle = await getDirectoryHandle();
+            if (handle) {
+                try {
+                    const folderName = getFolderName(modelerType, 'data_products');
+                    const dataProductsFolderHandle = await handle.getDirectoryHandle(folderName);
+                    await dataProductsFolderHandle.removeEntry(dataProduct.name);
+                } catch (error) {
+                    console.warn('Error deleting data product file from directory:', error);
+                }
+            }
+        }
+
+        const database = await openDB();
+        const storeName = getStoreName(modelerType, 'data_products');
+        const transaction = database.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        store.delete(fileId);
+
+        return true;
+    } catch (error) {
+        console.error('Error deleting data product from storage:', error);
+        return false;
+    }
 }
