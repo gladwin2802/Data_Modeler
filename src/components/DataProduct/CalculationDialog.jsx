@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const CalculationDialog = ({
   show,
@@ -10,11 +10,13 @@ const CalculationDialog = ({
   nodes = [],
   edges = []
 }) => {
-  const [expression, setExpression] = useState(initialExpression);
   const [availableFields, setAvailableFields] = useState([]);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
-    setExpression(initialExpression);
+    if (textareaRef.current) {
+      textareaRef.current.value = initialExpression;
+    }
   }, [initialExpression]);
 
   useEffect(() => {
@@ -32,8 +34,6 @@ const CalculationDialog = ({
     const incomingEdgesForField = edges.filter(
       e => e.target === nodeId && e.targetHandle === fieldTargetHandle
     );
-
-    console.log("Incoming edges for field:", incomingEdgesForField);
 
     if (incomingEdgesForField.length === 0) {
       setAvailableFields([]);
@@ -63,17 +63,18 @@ const CalculationDialog = ({
         }))
     );
 
-    console.log("Available fields for calculation:", fields);
-
     setAvailableFields(fields);
   }, [show, nodeId, nodes, edges, fieldName]);
 
-  const handleSave = useCallback(() => {
-    onSave(expression);
-  }, [onSave, expression]);
+  const handleSave = () => {
+    const currentValue = textareaRef.current?.value || "";
+    onSave(currentValue);
+  };
 
   const insertField = (fieldDisplay) => {
-    setExpression(prev => prev + fieldDisplay);
+    if (textareaRef.current) {
+      textareaRef.current.value += fieldDisplay;
+    }
   };
 
   if (!show) return null;
@@ -139,8 +140,8 @@ const CalculationDialog = ({
             Calculation Expression
           </label>
           <textarea
-            value={expression}
-            onChange={(e) => setExpression(e.target.value)}
+            ref={textareaRef}
+            defaultValue={initialExpression}
             placeholder="e.g., SUM(order_amount) / COUNT(order_id)"
             style={{
               width: "100%",

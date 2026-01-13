@@ -1272,10 +1272,10 @@ const DataProductPage = () => {
     setShowCalculationDialog(true);
   }, []);
 
-  const handleSaveCalculation = useCallback(() => {
+  const handleSaveCalculation = useCallback((expression) => {
     // Update calculation only in the corresponding field in nodes (not in edge data)
     if (calculationFieldNodeId && calculationFieldName) {
-      console.log("Saving calculation expression:", calculationExpression);
+      console.log("Saving calculation expression:", expression);
       setNodes((nds) =>
         nds.map((node) => {
           if (node.id === calculationFieldNodeId) {
@@ -1288,10 +1288,10 @@ const DataProductPage = () => {
                     ? {
                         ...field,
                         calculation:
-                          calculationExpression !== ""
+                          expression !== ""
                             ? {
                                 ...field.calculation,
-                                expression: calculationExpression,
+                                expression: expression,
                               }
                             : null,
                       }
@@ -1311,7 +1311,6 @@ const DataProductPage = () => {
     setCalculationFieldName(null);
   }, [
     nodes,
-    calculationExpression,
     setNodes,
     calculationFieldNodeId,
     calculationFieldName,
