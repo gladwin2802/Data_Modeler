@@ -18,6 +18,8 @@ const ControlPage = () => {
         const modelerParam = searchParams.get("modeler");
         return modelerParam === "pipeline" ? "pipeline" : "sql";
     });
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [distinctTables, setDistinctTables] = useState([]);
     const fileInputRef = useRef(null);
     const navigate = useNavigate();
 
@@ -391,11 +393,41 @@ const ControlPage = () => {
             return;
         }
         
-        navigate('/data-product', {
-            state: {
-                selectedFileIds: Array.from(selectedFiles)
+        extractDistinctTables();
+    };
+
+    const extractDistinctTables = async () => {
+        const tables = new Set();
+        const selectedFileList = files.filter(f => selectedFiles.has(f.id));
+
+        for (const file of selectedFileList) {
+            try {
+                const fileData = await getFile(file.id, modelerType, 'individual');
+                if (fileData && fileData.data) {
+                    const entities = fileData.data.entities || fileData.data.source_entities || {};
+                    for (const entityName in entities) {
+                        const baseType = entityName.startsWith('BASE_') ? 'BASE' : 
+                                       entityName.startsWith('VIEW_') ? 'VIEW' : entityName.startsWith('CTE_') ? 'CTE' : 'UNKNOWN';
+                        const displayName = entityName.replace(/^(BASE_|VIEW_|CTE_)/, '');
+                        tables.add(JSON.stringify({ name: displayName, type: baseType }));
+                    }
+                }
+            } catch (error) {
+                console.error(`Error reading file ${file.name}:`, error);
             }
-        });
+        }
+
+        const distinctTableList = Array.from(tables)
+            .map(t => JSON.parse(t))
+            .sort((a, b) => {
+                if (a.type !== b.type) {
+                    return a.type.localeCompare(b.type);
+                }
+                return a.name.localeCompare(b.name);
+            });
+        
+        setDistinctTables(distinctTableList);
+        setDrawerOpen(true);
     };
 
     const handleDataProductClick = async (dataProduct) => {
@@ -947,32 +979,60 @@ const ControlPage = () => {
                                                             Merge Selected
                                                         </button>
                                                         {modelerType === 'sql' && (
-                                                            <button
-                                                                onClick={handleCreateDataProduct}
-                                                                style={{
-                                                                    padding: "6px 12px",
-                                                                    background: "#10b981",
-                                                                    color: "white",
-                                                                    border: "none",
-                                                                    borderRadius: "6px",
-                                                                    cursor: "pointer",
-                                                                    fontSize: "13px",
-                                                                    fontWeight: 500,
-                                                                    transition: "all 200ms ease",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: "6px",
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    e.target.style.background = "#059669";
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    e.target.style.background = "#10b981";
-                                                                }}
-                                                            >
-                                                                <FiPackage size={14} />
-                                                                Create Data Product
-                                                            </button>
+                                                            <>
+                                                                {/*<button
+                                                                    onClick={extractDistinctTables}
+                                                                    style={{
+                                                                        padding: "6px 12px",
+                                                                        background: "#10b981",
+                                                                        color: "white",
+                                                                        border: "none",
+                                                                        borderRadius: "6px",
+                                                                        cursor: "pointer",
+                                                                        fontSize: "13px",
+                                                                        fontWeight: 500,
+                                                                        transition: "all 200ms ease",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "6px",
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.target.style.background = "#059669";
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.target.style.background = "#10b981";
+                                                                    }}
+                                                                >
+                                                                    <FiPackage size={14} />
+                                                                    View Tables
+                                                                </button>*/}
+                                                                <button
+                                                                    onClick={handleCreateDataProduct}
+                                                                    style={{
+                                                                        padding: "6px 12px",
+                                                                        background: "#10b981",
+                                                                        color: "white",
+                                                                        border: "none",
+                                                                        borderRadius: "6px",
+                                                                        cursor: "pointer",
+                                                                        fontSize: "13px",
+                                                                        fontWeight: 500,
+                                                                        transition: "all 200ms ease",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "6px",
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.target.style.background = "#059669";
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.target.style.background = "#10b981";
+                                                                    }}
+                                                                >
+                                                                    <FiPackage size={14} />
+                                                                    Create Data Product
+                                                                </button>
+                                                            </>
                                                         )}
                                                         <button
                                                             onClick={handleDeleteSelected}
@@ -1315,151 +1375,398 @@ const ControlPage = () => {
                                                 </div>
                                             </>
                                         )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
+                                    </>
+                                )}
 
-                                        {activeTab === "dataProducts" && (
+                                {activeTab === "dataProducts" && (
+                                    <>
+                                        {filteredDataProducts.length === 0 ? (
+                                            <div
+                                                style={{
+                                                    padding: "60px 20px",
+                                                    textAlign: "center",
+                                                    color: "#9ca3af",
+                                                }}
+                                            >
+                                                <FiPackage size={64} style={{ marginBottom: "16px", opacity: 0.5 }} />
+                                                <div style={{ fontSize: "18px", fontWeight: 500 }}>
+                                                    {searchQuery ? "No data products found" : "No data products yet"}
+                                                </div>
+                                                <div style={{ fontSize: "14px", marginTop: "8px" }}>
+                                                    {searchQuery
+                                                        ? "Try a different search term"
+                                                        : "Select SQL files and create a data product to get started"}
+                                                </div>
+                                            </div>
+                                        ) : (
                                             <>
-                                                {filteredDataProducts.length === 0 ? (
-                                                    <div
-                                                        style={{
-                                                            padding: "60px 20px",
-                                                            textAlign: "center",
-                                                            color: "#9ca3af",
-                                                        }}
-                                                    >
-                                                        <FiPackage size={64} style={{ marginBottom: "16px", opacity: 0.5 }} />
-                                                        <div style={{ fontSize: "18px", fontWeight: 500 }}>
-                                                            {searchQuery ? "No data products found" : "No data products yet"}
-                                                        </div>
-                                                        <div style={{ fontSize: "14px", marginTop: "8px" }}>
-                                                            {searchQuery
-                                                                ? "Try a different search term"
-                                                                : "Select SQL files and create a data product to get started"}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
+                                                <div
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns: "1fr auto auto auto",
+                                                        gap: "16px",
+                                                        padding: "16px 20px",
+                                                        background: "#f9fafb",
+                                                        borderBottom: "1px solid #e5e7eb",
+                                                        alignItems: "center",
+                                                        fontSize: "12px",
+                                                        fontWeight: 600,
+                                                        color: "#6b7280",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px",
+                                                    }}
+                                                >
+                                                    <div>Product Name</div>
+                                                    <div>Created Date</div>
+                                                    <div style={{ width: "40px" }}></div>
+                                                    <div style={{ width: "40px" }}></div>
+                                                </div>
+                                                <div>
+                                                    {filteredDataProducts.map((product, index) => (
                                                         <div
+                                                            key={product.id}
+                                                            onClick={() => handleDataProductClick(product)}
                                                             style={{
                                                                 display: "grid",
                                                                 gridTemplateColumns: "1fr auto auto auto",
                                                                 gap: "16px",
                                                                 padding: "16px 20px",
-                                                                background: "#f9fafb",
-                                                                borderBottom: "1px solid #e5e7eb",
+                                                                borderBottom: index < filteredDataProducts.length - 1 ? "1px solid #e5e7eb" : "none",
+                                                                cursor: "pointer",
+                                                                transition: "all 200ms ease",
                                                                 alignItems: "center",
-                                                                fontSize: "12px",
-                                                                fontWeight: 600,
-                                                                color: "#6b7280",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px",
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.background = "#f9fafb";
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.background = "white";
                                                             }}
                                                         >
-                                                            <div>Product Name</div>
-                                                            <div>Created Date</div>
-                                                            <div style={{ width: "40px" }}></div>
-                                                            <div style={{ width: "40px" }}></div>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: "14px",
+                                                                    fontWeight: 500,
+                                                                    color: "#1f2937",
+                                                                    wordBreak: "break-word",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "8px",
+                                                                }}
+                                                            >
+                                                                <FiPackage size={20} color="#10b981" />
+                                                                {product.name}
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: "13px",
+                                                                    color: "#6b7280",
+                                                                }}
+                                                            >
+                                                                {new Date(product.createdAt).toLocaleDateString()}
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => handleRenameDataProduct(e, product.id)}
+                                                                style={{
+                                                                    background: "rgba(16, 185, 129, 0.1)",
+                                                                    border: "none",
+                                                                    borderRadius: "6px",
+                                                                    padding: "6px",
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    transition: "all 200ms ease",
+                                                                    width: "32px",
+                                                                    height: "32px",
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.target.style.background = "rgba(16, 185, 129, 0.2)";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.target.style.background = "rgba(16, 185, 129, 0.1)";
+                                                                }}
+                                                            >
+                                                                <FiEdit2 size={16} color="#10b981" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDeleteDataProduct(e, product.id)}
+                                                                style={{
+                                                                    background: "rgba(239, 68, 68, 0.1)",
+                                                                    border: "none",
+                                                                    borderRadius: "6px",
+                                                                    padding: "6px",
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    transition: "all 200ms ease",
+                                                                    width: "32px",
+                                                                    height: "32px",
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.target.style.background = "rgba(239, 68, 68, 0.2)";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.target.style.background = "rgba(239, 68, 68, 0.1)";
+                                                                }}
+                                                            >
+                                                                <FiTrash2 size={16} color="#ef4444" />
+                                                            </button>
                                                         </div>
-                                                        <div>
-                                                            {filteredDataProducts.map((product, index) => (
-                                                                <div
-                                                                    key={product.id}
-                                                                    onClick={() => handleDataProductClick(product)}
-                                                                    style={{
-                                                                        display: "grid",
-                                                                        gridTemplateColumns: "1fr auto auto auto",
-                                                                        gap: "16px",
-                                                                        padding: "16px 20px",
-                                                                        borderBottom: index < filteredDataProducts.length - 1 ? "1px solid #e5e7eb" : "none",
-                                                                        cursor: "pointer",
-                                                                        transition: "all 200ms ease",
-                                                                        alignItems: "center",
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        e.currentTarget.style.background = "#f9fafb";
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        e.currentTarget.style.background = "white";
-                                                                    }}
-                                                                >
-                                                                    <div
-                                                                        style={{
-                                                                            fontSize: "14px",
-                                                                            fontWeight: 500,
-                                                                            color: "#1f2937",
-                                                                            wordBreak: "break-word",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            gap: "8px",
-                                                                        }}
-                                                                    >
-                                                                        <FiPackage size={20} color="#10b981" />
-                                                                        {product.name}
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            fontSize: "13px",
-                                                                            color: "#6b7280",
-                                                                        }}
-                                                                    >
-                                                                        {new Date(product.createdAt).toLocaleDateString()}
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={(e) => handleRenameDataProduct(e, product.id)}
-                                                                        style={{
-                                                                            background: "rgba(16, 185, 129, 0.1)",
-                                                                            border: "none",
-                                                                            borderRadius: "6px",
-                                                                            cursor: "pointer",
-                                                                            transition: "all 200ms ease",
-                                                                            width: "32px",
-                                                                            height: "32px",
-                                                                        }}
-                                                                        onMouseEnter={(e) => {
-                                                                            e.target.style.background = "rgba(16, 185, 129, 0.2)";
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            e.target.style.background = "rgba(16, 185, 129, 0.1)";
-                                                                        }}
-                                                                    >
-                                                                        <FiEdit2 size={16} color="#10b981" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => handleDeleteDataProduct(e, product.id)}
-                                                                        style={{
-                                                                            background: "rgba(239, 68, 68, 0.1)",
-                                                                            border: "none",
-                                                                            borderRadius: "6px",
-                                                                            cursor: "pointer",
-                                                                            transition: "all 200ms ease",
-                                                                            width: "32px",
-                                                                            height: "32px",
-                                                                        }}
-                                                                        onMouseEnter={(e) => {
-                                                                            e.target.style.background = "rgba(239, 68, 68, 0.2)";
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            e.target.style.background = "rgba(239, 68, 68, 0.1)";
-                                                                        }}
-                                                                    >
-                                                                        <FiTrash2 size={16} color="#ef4444" />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </>
-                                                )}
+                                                    ))}
+                                                </div>
                                             </>
                                         )}
-                                    </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {drawerOpen && (
+                    <>
+                        <div
+                            onClick={() => setDrawerOpen(false)}
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "rgba(0, 0, 0, 0.5)",
+                                zIndex: 999,
+                            }}
+                        />
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                right: 0,
+                                bottom: 0,
+                                width: "500px",
+                                background: "white",
+                                boxShadow: "-4px 0 12px rgba(0, 0, 0, 0.15)",
+                                zIndex: 1000,
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    padding: "18px",
+                                    borderBottom: "1px solid #e5e7eb",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
+                                <div>
+                                    <h2
+                                        style={{
+                                            fontSize: "20px",
+                                            fontWeight: 600,
+                                            color: "#1f2937",
+                                            margin : "4px",
+                                        }}
+                                    >
+                                        Distinct Tables
+                                    </h2>
+                                    <p
+                                        style={{
+                                            fontSize: "14px",
+                                            color: "#6b7280",
+                                        }}
+                                    >
+                                        {distinctTables.length} table(s) found from {selectedFiles.size} selected file(s)
+                                        {distinctTables.length > 0 && (
+                                            <span style={{ marginTop: "4px", display: "block", fontSize: "12px", color: "#9ca3af" }}>
+                                                {(() => {
+                                                    const typeCounts = {};
+                                                    distinctTables.forEach(table => {
+                                                        typeCounts[table.type] = (typeCounts[table.type] || 0) + 1;
+                                                    });
+                                                    return Object.entries(typeCounts)
+                                                        .map(([type, count]) => `${count} ${type}`)
+                                                        .join(' , ');
+                                                })()}
+                                            </span>
+                                        )}
+                                    </p>
                                 </div>
+                                <button
+                                    onClick={() => setDrawerOpen(false)}
+                                    style={{
+                                        background: "transparent",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        padding: "8px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        borderRadius: "6px",
+                                        transition: "all 200ms ease",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = "#f3f4f6";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = "transparent";
+                                    }}
+                                >
+                                    <FiX size={24} color="#6b7280" />
+                                </button>
+                            </div>
+                            <div
+                                style={{
+                                    flex: 1,
+                                    overflowY: "auto",
+                                    padding: "16px",
+                                }}
+                            >
+                                {distinctTables.length === 0 ? (
+                                    <div
+                                        style={{
+                                            padding: "60px 20px",
+                                            textAlign: "center",
+                                            color: "#9ca3af",
+                                        }}
+                                    >
+                                        <FiPackage size={48} style={{ marginBottom: "16px", opacity: 0.5 }} />
+                                        <div style={{ fontSize: "16px", fontWeight: 500 }}>
+                                            No tables found
+                                        </div>
+                                        <div style={{ fontSize: "14px", marginTop: "8px" }}>
+                                            The selected files don't contain any BASE tables
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "8px",
+                                        }}
+                                    >
+                                        {distinctTables.map((table, index) => {
+                                            const typeColor = table.type === 'BASE' 
+                                                ? { bg: '#eff6ff', border: '#3b82f6', text: '#3b82f6' }
+                                                : table.type === 'VIEW'
+                                                ? { bg: '#d1fae5', border: '#10b981', text: '#10b981' }
+                                                : { bg: '#f3e8ff', border: '#8b5cf6', text: '#8b5cf6' };
+                                            return (
+                                            <div
+                                                key={index}
+                                                style={{
+                                                    padding: "16px",
+                                                    background: "#f9fafb",
+                                                    border: `2px solid ${typeColor.border}`,
+                                                    borderRadius: "8px",
+                                                    fontSize: "14px",
+                                                    fontWeight: 500,
+                                                    color: "#1f2937",
+                                                    transition: "all 200ms ease",
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = typeColor.bg;
+                                                    e.currentTarget.style.transform = "translateX(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "#f9fafb";
+                                                    e.currentTarget.style.transform = "translateX(0)";
+                                                    e.currentTarget.style.boxShadow = "none";
+                                                }}
+                                            >
+                                                <span>{table.name}</span>
+                                                <span style={{
+                                                    fontSize: "11px",
+                                                    fontWeight: 600,
+                                                    padding: "4px 8px",
+                                                    borderRadius: "4px",
+                                                    background: typeColor.bg,
+                                                    color: typeColor.text,
+                                                }}>
+                                                    {table.type}
+                                                </span>
+                                            </div>
+                                        );})}
+                                    </div>
+                                )}
+                            </div>
+                            <div
+                                style={{
+                                    padding: "20px 24px",
+                                    borderTop: "1px solid #e5e7eb",
+                                    display: "flex",
+                                    gap: "12px",
+                                }}
+                            >
+                                <button
+                                    onClick={() => setDrawerOpen(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px 16px",
+                                        background: "transparent",
+                                        color: "#6b7280",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "8px",
+                                        cursor: "pointer",
+                                        fontWeight: 500,
+                                        fontSize: "14px",
+                                        transition: "all 200ms ease",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = "#f3f4f6";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = "transparent";
+                                    }}
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        navigate("/data-product", {
+                                            state: {
+                                                selectedFileIds: Array.from(selectedFiles)
+                                            }
+                                        });
+                                        setDrawerOpen(false);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px 16px",
+                                        background: "#10b981",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "8px",
+                                        cursor: "pointer",
+                                        fontWeight: 500,
+                                        fontSize: "14px",
+                                        transition: "all 200ms ease",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = "#059669";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = "#10b981";
+                                    }}
+                                >
+                                    Create Product
+                                </button>
                             </div>
                         </div>
-                    );
-                };
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default ControlPage;
-

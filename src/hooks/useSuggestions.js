@@ -1,183 +1,137 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 export const useSuggestions = () => {
     const [showSuggestDialog, setShowSuggestDialog] = useState(false);
     const [suggestions, setSuggestions] = useState([]);
 
-    const generateSuggestions = useCallback((nodes, sourceDataProduct) => {
-        if (!sourceDataProduct || !sourceDataProduct.entities) {
-            setSuggestions([]);
-            return;
-        }
+    const generateSuggestions = async (nodes, entitySource) => {
+        try {
+            const sourceEntities = entitySource?.entities || {};
+            const sourceName = entitySource?.metadata?.name || 'Data Product';
 
-        const canvasEntityKeys = new Set(
-            nodes.map(node => `${node.data.tableType}_${node.data.tableName}`)
-        );
-
-        const allSuggestions = [];
-
-        for (const entityKey in sourceDataProduct.entities) {
-            if (canvasEntityKeys.has(entityKey)) {
-                continue;
+            if (!entitySource || Object.keys(sourceEntities).length === 0) {
+                alert('No data product entities available for suggestions.');
+                return;
             }
 
-            const entity = sourceDataProduct.entities[entityKey];
-            const entityType = entityKey.split('_')[0];
-            const entityName = entityKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
+            const canvasTables = nodes.map(node => ({
+                name: node.data.tableName,
+                type: node.data.tableType,
+                fields: node.data.fields.map(f => f.name),
+                fullKey: `${node.data.tableType}_${node.data.tableName}`
+            }));
 
-            if (entityType === 'BASE') {
-                continue;
+            if (canvasTables.length === 0) {
+                alert('Please add some tables to the canvas first!');
+                return;
             }
 
-            const referencedEntities = [];
-            const matchingTables = [];
-            const missingEntities = [];
-            const dependencyMap = {};
+            const canvasEntityKeys = new Set(canvasTables.map(t => t.fullKey));
 
-            if (entity.fields) {
-                for (const fieldName in entity.fields) {
-                    const field = entity.fields[fieldName];
+            const foundSuggestions = [];
+            for (const entityKey in sourceEntities) {
+                if (canvasEntityKeys.has(entityKey)) continue;
+                if (!entityKey.startsWith('CTE_') && !entityKey.startsWith('VIEW_')) continue;
+
+                const entity = sourceEntities[entityKey];
+                const entityFields = Object.keys(entity.fields || {});
+                if (entityFields.length === 0) continue;
+
+                const referencedEntities = new Set();
+                const missingReferencedEntities = new Set();
+                const dependencyMap = {}; // Map of dependent entities to their connection details
+                const dependencyTypes = {}; // Track the type of each dependency (BASE, CTE, VIEW)
+                
+                entityFields.forEach(fieldName => {
+                    const fieldData = entity.fields[fieldName];
                     
-                    if (field.ref) {
-                        // Handle both object format {entity, field} and array format ["entity.field"]
-                        const refs = Array.isArray(field.ref) ? field.ref : [field.ref];
-                        
-                        refs.forEach(refItem => {
-                            let refEntityKey, refFieldName;
-                            
-                            if (typeof refItem === 'string') {
-                                // Handle array format: ["BASE_table.field"]
-                                [refEntityKey, refFieldName] = refItem.split('.');
-                            } else if (typeof refItem === 'object' && refItem.entity) {
-                                // Handle object format: {entity: "BASE_table", field: "field"}
-                                refEntityKey = refItem.entity;
-                                refFieldName = refItem.field;
-                            }
-                            
-                            if (!refEntityKey) return;
-                            
-                            const refEntityName = refEntityKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
-                            const refEntityType = refEntityKey.split('_')[0];
-
-                            if (!referencedEntities.includes(refEntityKey)) {
-                                referencedEntities.push(refEntityKey);
-                            }
-
-                            const isOnCanvas = canvasEntityKeys.has(refEntityKey);
-                            if (isOnCanvas) {
-                                if (!matchingTables.includes(refEntityName)) {
-                                    matchingTables.push(refEntityName);
-                                }
-
-                                if (!dependencyMap[refEntityKey]) {
-                                    dependencyMap[refEntityKey] = [];
-                                }
-                                dependencyMap[refEntityKey].push({
-                                    sourceField: refFieldName || 'unknown',
-                                    targetField: fieldName,
-                                    connectionType: 'ref'
-                                });
-                            } else {
-                                if (!missingEntities.some(e => e.name === refEntityName)) {
-                                    missingEntities.push({
-                                        name: refEntityName,
-                                        type: refEntityType
-                                    });
-                                }
-                            }
-                        });
-                    }
-
-                    if (field.calculation && field.calculation.ref) {
-                        const refs = Array.isArray(field.calculation.ref) ? field.calculation.ref : [];
-                        refs.forEach(refPath => {
-                            const parts = refPath.split('.');
-                            if (parts.length >= 2) {
-                                const refEntityKey = parts[0];
-                                const refFieldName = parts.slice(1).join('.');
-
-                                if (!referencedEntities.includes(refEntityKey)) {
-                                    referencedEntities.push(refEntityKey);
-                                }
-
-                                const isOnCanvas = canvasEntityKeys.has(refEntityKey);
-                                if (isOnCanvas) {
-                                    if (!dependencyMap[refEntityKey]) {
-                                        dependencyMap[refEntityKey] = [];
+                    const processRefs = (refs, isCalculation = false) => {
+                        if (refs && Array.isArray(refs)) {
+                            refs.forEach(refPath => {
+                                const [refEntity, refField] = refPath.split('.');
+                                if (refEntity && refField) {
+                                    const isOnCanvas = canvasTables.some(t => 
+                                        t.fullKey === refEntity || `${t.type}_${t.name}` === refEntity
+                                    );
+                                    
+                                    // Extract entity type from the full key (BASE_, CTE_, VIEW_)
+                                    const entityType = refEntity.split('_')[0]; // BASE, CTE, or VIEW
+                                    const entityName = refEntity.substring(entityType.length + 1); // Remove prefix
+                                    
+                                    // Store dependency details for connection creation with original dependency info
+                                    if (!dependencyMap[refEntity]) {
+                                        dependencyMap[refEntity] = [];
+                                        dependencyTypes[refEntity] = { type: entityType, name: entityName };
                                     }
-                                    dependencyMap[refEntityKey].push({
-                                        sourceField: refFieldName,
+                                    dependencyMap[refEntity].push({
                                         targetField: fieldName,
-                                        connectionType: 'calculation'
+                                        sourceField: refField,
+                                        connectionType: isCalculation ? 'calculation' : 'ref',
+                                        calculation: isCalculation ? (fieldData.calculation?.expression || '') : null,
+                                        dependencyEntityType: entityType, // Track original dependency type
+                                        dependencyEntityName: entityName
                                     });
+                                    
+                                    if (isOnCanvas) {
+                                        referencedEntities.add(refEntity);
+                                    } else {
+                                        missingReferencedEntities.add(refEntity);
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
+                    };
+
+                    processRefs(fieldData.ref, false);
+                    if (fieldData.calculation) {
+                        processRefs(fieldData.calculation.ref, true);
                     }
-
-                    if (field.calculation && field.calculation.dependencies) {
-                        field.calculation.dependencies.forEach(dep => {
-                            const depEntityKey = dep.entity;
-                            if (!depEntityKey) return;
-                            
-                            const depEntityName = depEntityKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
-                            const depEntityType = depEntityKey.split('_')[0];
-
-                            if (!referencedEntities.includes(depEntityKey)) {
-                                referencedEntities.push(depEntityKey);
-                            }
-
-                            const isOnCanvas = canvasEntityKeys.has(depEntityKey);
-                            if (isOnCanvas) {
-                                if (!matchingTables.includes(depEntityName)) {
-                                    matchingTables.push(depEntityName);
-                                }
-
-                                if (!dependencyMap[depEntityKey]) {
-                                    dependencyMap[depEntityKey] = [];
-                                }
-                                dependencyMap[depEntityKey].push({
-                                    sourceField: dep.field,
-                                    targetField: fieldName,
-                                    connectionType: 'calculation'
-                                });
-                            } else {
-                                if (!missingEntities.some(e => e.name === depEntityName)) {
-                                    missingEntities.push({
-                                        name: depEntityName,
-                                        type: depEntityType
-                                    });
-                                }
-                            }
-                        });
-                    }
+                });
+                
+                if (referencedEntities.size > 0) {
+                    const totalReferencedEntities = referencedEntities.size + missingReferencedEntities.size;
+                    const coveragePercent = Math.round((referencedEntities.size / totalReferencedEntities) * 100);
+                    
+                    const missingEntitiesWithTypes = Array.from(missingReferencedEntities).map(fullKey => {
+                        const type = fullKey.match(/^(BASE|CTE|VIEW)_/) ? fullKey.match(/^(BASE|CTE|VIEW)_/)[1] : 'BASE';
+                        const name = fullKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
+                        return { fullKey, name, type };
+                    });
+                    
+                    foundSuggestions.push({
+                        entityName: entityKey,
+                        alias: entity.alias || entityKey,
+                        entityType: entityKey.startsWith('CTE_') ? 'CTE' : 'VIEW',
+                        sourceFile: sourceName,
+                        matchingTables: Array.from(referencedEntities).map(e => e.replace(/^(BASE_|CTE_|VIEW_)/, '')),
+                        coveragePercent,
+                        missingEntities: missingEntitiesWithTypes,
+                        totalFields: entityFields.length,
+                        referencedEntitiesCount: totalReferencedEntities,
+                        dependencyMap, // Store the complete dependency mapping with connection details
+                        entityData: entity // Store full entity data for later use
+                    });
                 }
             }
 
-            const coveragePercent = referencedEntities.length > 0
-                ? Math.round((matchingTables.length / referencedEntities.length) * 100)
-                : 0;
-
-            if (matchingTables.length > 0) {
-                allSuggestions.push({
-                    entityName,
-                    entityType,
-                    alias: entity.alias || null,
-                    sourceFile: sourceDataProduct.metadata?.name || 'Unknown',
-                    referencedEntitiesCount: referencedEntities.length,
-                    matchingTables,
-                    missingEntities,
-                    coveragePercent,
-                    dependencyMap,
-                    level: 1,
-                    entityData: entity
-                });
+            const uniqueSuggestions = [];
+            const seenEntities = new Set();
+            
+            for (const suggestion of foundSuggestions) {
+                if (!seenEntities.has(suggestion.entityName)) {
+                    seenEntities.add(suggestion.entityName);
+                    uniqueSuggestions.push(suggestion);
+                }
             }
-        }
 
-        setSuggestions(allSuggestions);
-        setShowSuggestDialog(true);
-    }, []);
+            uniqueSuggestions.sort((a, b) => b.coveragePercent - a.coveragePercent);
+            setSuggestions(uniqueSuggestions);
+            setShowSuggestDialog(true);
+        } catch (error) {
+            console.error('Error generating suggestions:', error);
+            alert('Error generating suggestions: ' + error.message);
+        }
+    };
 
     return {
         showSuggestDialog,

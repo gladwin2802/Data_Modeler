@@ -47,9 +47,10 @@ const DataProductSidebar = ({
             <div
                 style={{
                     width: isOpen ? "320px" : "0",
+                    height: "93vh",
                     background: "white",
                     borderRight: "1px solid #e5e7eb",
-                    overflow: "hidden",
+                    overflow: "auto",
                     transition: "width 300ms ease",
                     display: "flex",
                     flexDirection: "column",
@@ -146,7 +147,7 @@ const DataProductSidebar = ({
 
                         <div style={{ flex: 1, overflow: "auto", padding: "16px" }}>
                             {activeTab === 'BASE' && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", overflow: "auto" }}>
                                     {filterTables([...new Set([...fileBaseTables, ...customTables.BASE])]).map((table) => {
                                         const fieldCount = tableMetadata[`BASE_${table}`]?.fields?.length || 0;
                                         const onCanvas = isOnCanvas(table, 'BASE');

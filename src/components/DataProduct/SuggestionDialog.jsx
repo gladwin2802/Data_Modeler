@@ -10,7 +10,7 @@ const SuggestionDialog = ({
     const [expandedSuggestions, setExpandedSuggestions] = useState(new Set());
 
     const toggleExpanded = (entityName, e) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent card click when toggling expand
         setExpandedSuggestions(prev => {
             const newSet = new Set(prev);
             if (newSet.has(entityName)) {
@@ -165,6 +165,7 @@ const SuggestionDialog = ({
                     )}
                 </div>
                 
+                {/* Expand button and connection details */}
                 {connectionCount > 0 && (
                     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #e5e7eb" }}>
                         <button

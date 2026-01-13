@@ -68,17 +68,40 @@ function openDB() {
     });
 }
 
+async function checkAndRequestPermission(handle) {
+    try {
+        const permission = await handle.queryPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+            return true;
+        }
+        // Only request permission if it was previously denied or never asked
+        // This should only be called from direct user gestures
+        if (permission === 'prompt') {
+            await handle.requestPermission({ mode: 'readwrite' });
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Permission check error:', error);
+        return false;
+    }
+}
+
 async function getDirectoryHandle(shouldSync = false) {
     if (directoryHandle) {
         try {
-            await directoryHandle.requestPermission({ mode: 'readwrite' });
+            const hasPermission = await checkAndRequestPermission(directoryHandle);
+            if (!hasPermission) {
+                directoryHandle = null;
+                return null;
+            }
             await createRequiredFolders(directoryHandle);
             if (shouldSync) {
                 await syncAllFilesFromDirectory(directoryHandle);
             }
             return directoryHandle;
         } catch (error) {
-            console.error('Permission error:', error);
+            console.error('Error with cached directory handle:', error);
             directoryHandle = null;
         }
     }
@@ -93,7 +116,11 @@ async function getDirectoryHandle(shouldSync = false) {
             const handle = request.result;
             if (handle) {
                 try {
-                    await handle.requestPermission({ mode: 'readwrite' });
+                    const hasPermission = await checkAndRequestPermission(handle);
+                    if (!hasPermission) {
+                        resolve(null);
+                        return;
+                    }
                     directoryHandle = handle;
                     await createRequiredFolders(handle);
                     if (shouldSync) {

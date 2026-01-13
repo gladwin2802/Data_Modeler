@@ -2,14 +2,21 @@ import { useState, useCallback, useEffect, memo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   FiArrowLeft,
+  FiPackage,
+  FiDatabase,
+  FiPlus,
   FiSave,
+  FiTrash2,
+  FiSearch,
+  FiEdit2,
   FiZap,
   FiChevronsLeft,
   FiChevronsRight,
   FiKey,
+  FiDownload,
+  FiX,
   FiSettings,
   FiLayout,
-  FiDownload,
 } from "react-icons/fi";
 import ReactFlow, {
   MiniMap,
@@ -26,7 +33,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { getFile, saveDataProduct } from "../utils/ControlPage/fileStorage";
-import { applyLayout } from "../utils/DataProduct/layout";
+import { getLayoutedElements, applyLayout } from "../utils/DataProduct/layout";
 import SuggestionDialog from "../components/DataProduct/SuggestionDialog";
 import ReverseDepsDialog from "../components/DataProduct/ReverseDepsDialog";
 import DataProductSidebar from "../components/DataProduct/DataProductSidebar";
@@ -88,7 +95,8 @@ const TableNode = memo(({ data, id }) => {
           </div>
         </div>
         <div style={{ display: "flex", gap: "4px" }}>
-          {(data.tableType === "CTE" || data.tableType === "VIEW") && !data.iscustom && (
+          {(data.tableType === "CTE" || data.tableType === "VIEW") &&
+            !data.iscustom && (
               <>
                 <button
                   onClick={(e) => {
@@ -249,9 +257,12 @@ const TableNode = memo(({ data, id }) => {
                   }}
                   title={(() => {
                     const toggleKey = `${id}_${field.name}`;
-                    const isToggled = data.attributeToggles?.[toggleKey] || false;
+                    const isToggled =
+                      data.attributeToggles?.[toggleKey] || false;
                     const effectiveMode = isToggled
-                      ? data.globalAttributeMode === "runtime" ? "loadtime" : "runtime"
+                      ? data.globalAttributeMode === "runtime"
+                        ? "loadtime"
+                        : "runtime"
                       : data.globalAttributeMode;
                     return effectiveMode;
                   })()}
@@ -280,7 +291,8 @@ const TableNode = memo(({ data, id }) => {
                       bottom: 0,
                       backgroundColor: (() => {
                         const toggleKey = `${id}_${field.name}`;
-                        const isToggled = data.attributeToggles?.[toggleKey] || false;
+                        const isToggled =
+                          data.attributeToggles?.[toggleKey] || false;
                         return isToggled ? "#6366f1" : "#cbd5e1";
                       })(),
                       transition: "0.3s",
@@ -295,7 +307,8 @@ const TableNode = memo(({ data, id }) => {
                         width: "12px",
                         left: (() => {
                           const toggleKey = `${id}_${field.name}`;
-                          const isToggled = data.attributeToggles?.[toggleKey] || false;
+                          const isToggled =
+                            data.attributeToggles?.[toggleKey] || false;
                           return isToggled ? "14px" : "2px";
                         })(),
                         bottom: "2px",
@@ -424,22 +437,31 @@ const DataProductPage = () => {
   const [addFieldNodeId, setAddFieldNodeId] = useState(null);
   const [newFieldName, setNewFieldName] = useState("");
   const [newFieldType, setNewFieldType] = useState("VARCHAR");
+  const [showDeleteFieldConfirm, setShowDeleteFieldConfirm] = useState(false);
+  const [deleteFieldInfo, setDeleteFieldInfo] = useState({
+    nodeId: null,
+    fieldName: null,
+  });
   const [activeTableTab, setActiveTableTab] = useState("BASE");
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
-  const [currentDataProductId, setCurrentDataProductId] = useState(dataProductId);
-  const [currentDataProductName, setCurrentDataProductName] = useState(dataProductName);
-  const [showReverseDepsDialog, setShowReverseDepsDialog] = useState(false);
-  const [reverseDeps, setReverseDeps] = useState([]);
-  const [selectedEntityForReverseDeps, setSelectedEntityForReverseDeps] = useState(null);
-  const [sourceDataProduct, setSourceDataProduct] = useState(dataProductData || null);
+  const [showConnectionTypeDialog, setShowConnectionTypeDialog] =
+    useState(false);
+  const [selectedEdgeDetails, setSelectedEdgeDetails] = useState(null);
   const [showCalculationDialog, setShowCalculationDialog] = useState(false);
   const [calculationExpression, setCalculationExpression] = useState("");
   const [calculationFieldNodeId, setCalculationFieldNodeId] = useState(null);
   const [calculationFieldName, setCalculationFieldName] = useState(null);
-  const [showConnectionTypeDialog, setShowConnectionTypeDialog] = useState(false);
-  const [selectedEdgeDetails, setSelectedEdgeDetails] = useState(null);
+  const [currentDataProductId, setCurrentDataProductId] =
+    useState(dataProductId);
+  const [currentDataProductName, setCurrentDataProductName] =
+    useState(dataProductName);
+  const [showReverseDepsDialog, setShowReverseDepsDialog] = useState(false);
+  const [reverseDeps, setReverseDeps] = useState([]);
+  const [selectedEntityForReverseDeps, setSelectedEntityForReverseDeps] =
+    useState(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportJson, setExportJson] = useState("");
+  const [selectedFields, setSelectedFields] = useState({});
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [settingsData, setSettingsData] = useState({
     nodeId: null,
@@ -447,6 +469,7 @@ const DataProductPage = () => {
     allFields: [],
     sourceEntityName: "",
   });
+  const [settingsActiveTab, setSettingsActiveTab] = useState("byMode");
   const [globalAttributeMode, setGlobalAttributeMode] = useState("runtime");
   const [entityAttributeModes, setEntityAttributeModes] = useState({});
   const entityAttributeModesRef = useRef({});
@@ -456,6 +479,10 @@ const DataProductPage = () => {
   const [attributeSearchQuery, setAttributeSearchQuery] = useState("");
   const [newEntityName, setNewEntityName] = useState("");
   const [newEntityType, setNewEntityType] = useState("CTE");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sourceDataProduct, setSourceDataProduct] = useState(
+    dataProductData || null
+  );
 
   const {
     showSuggestDialog,
@@ -464,581 +491,7 @@ const DataProductPage = () => {
     setShowSuggestDialog,
   } = useSuggestions();
 
-  useEffect(() => {
-    entityAttributeModesRef.current = entityAttributeModes;
-  }, [entityAttributeModes]);
-
-  useEffect(() => {
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        const entityMode = entityAttributeModes[node.id] || "runtime";
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            attributeToggles,
-            globalAttributeMode: entityMode,
-          },
-        };
-      })
-    );
-  }, [attributeToggles, entityAttributeModes]);
-
-  useEffect(() => {
-    if (dataProductData) {
-      loadDataProduct(dataProductData);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!dataProductData && selectedFileIds.length > 0) {
-      loadTableMetadata();
-    }
-  }, [selectedFileIds]);
-
-  const onLayout = useCallback(() => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = applyLayout(
-      nodes,
-      edges,
-      "dagre",
-      "LR"
-    );
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
-  }, [nodes, edges, setNodes, setEdges]);
-
-  useEffect(() => {
-    if (nodes.length > 0 && edges.length >= 0) {
-      const timer = setTimeout(() => {
-        onLayout();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const loadTableMetadata = async () => {
-    const metadata = {};
-    const baseTables = new Set();
-    const viewTables = new Set();
-    const cteTables = new Set();
-    const combinedEntities = {};
-
-    for (const fileId of selectedFileIds) {
-      try {
-        const fileData = await getFile(fileId, 'sql', 'individual');
-        if (fileData && fileData.data && fileData.data.entities) {
-          Object.assign(combinedEntities, fileData.data.entities);
-
-          for (const entityName in fileData.data.entities) {
-            if (entityName.startsWith("BASE_")) {
-              const baseName = entityName.replace("BASE_", "");
-              baseTables.add(baseName);
-              const entity = fileData.data.entities[entityName];
-              const metadataKey = `BASE_${baseName}`;
-              if (!metadata[metadataKey]) {
-                metadata[metadataKey] = {
-                  name: baseName,
-                  type: "BASE",
-                  fields: [],
-                };
-              }
-              if (entity.fields) {
-                for (const fieldName in entity.fields) {
-                  const field = entity.fields[fieldName];
-                  if (!metadata[metadataKey].fields.some((f) => f.name === fieldName)) {
-                    metadata[metadataKey].fields.push({
-                      name: fieldName,
-                      type: field.type || "unknown",
-                      ref: field.ref || null,
-                      isPK: field.isPK || false,
-                      calculation: field.calculation || null,
-                    });
-                  }
-                }
-              }
-              metadata[metadataKey].iscustom = false;
-            }
-            else if (entityName.startsWith("VIEW_")) {
-              const viewName = entityName.replace("VIEW_", "");
-              viewTables.add(viewName);
-              const entity = fileData.data.entities[entityName];
-              const metadataKey = `VIEW_${viewName}`;
-              if (!metadata[metadataKey]) {
-                metadata[metadataKey] = {
-                  name: viewName,
-                  type: "VIEW",
-                  fields: [],
-                };
-              }
-              if (entity.fields) {
-                for (const fieldName in entity.fields) {
-                  const field = entity.fields[fieldName];
-                  if (!metadata[metadataKey].fields.some((f) => f.name === fieldName)) {
-                    metadata[metadataKey].fields.push({
-                      name: fieldName,
-                      type: field.type || "unknown",
-                      ref: field.ref || null,
-                      isPK: field.isPK || false,
-                      calculation: field.calculation || null,
-                    });
-                  }
-                }
-              }
-              metadata[metadataKey].iscustom = false;
-            }
-            else if (entityName.startsWith("CTE_")) {
-              const cteName = entityName.replace("CTE_", "");
-              cteTables.add(cteName);
-              const entity = fileData.data.entities[entityName];
-              const metadataKey = `CTE_${cteName}`;
-              if (!metadata[metadataKey]) {
-                metadata[metadataKey] = {
-                  name: cteName,
-                  type: "CTE",
-                  fields: [],
-                };
-              }
-              if (entity.fields) {
-                for (const fieldName in entity.fields) {
-                  const field = entity.fields[fieldName];
-                  if (!metadata[metadataKey].fields.some((f) => f.name === fieldName)) {
-                    metadata[metadataKey].fields.push({
-                      name: fieldName,
-                      type: field.type || "unknown",
-                      ref: field.ref || null,
-                      isPK: field.isPK || false,
-                      calculation: field.calculation || null,
-                    });
-                  }
-                }
-              }
-              metadata[metadataKey].iscustom = false;
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error loading metadata for file ${fileId}:`, error);
-      }
-    }
-
-    setTableMetadata(metadata);
-    setFileBaseTables(Array.from(baseTables).sort());
-    setFileViewTables(Array.from(viewTables).sort());
-    setFileCteTables(Array.from(cteTables).sort());
-
-    if (Object.keys(combinedEntities).length > 0) {
-      setSourceDataProduct({
-        entities: combinedEntities,
-        metadata: { name: "Selected Files" },
-      });
-    }
-  };
-
-  const loadDataProduct = (dataProduct) => {
-    try {
-      setSourceDataProduct(dataProduct || null);
-
-      const loadedNodes = [];
-      const loadedEdges = [];
-
-      const entitiesArray = Array.isArray(dataProduct.entities)
-        ? dataProduct.entities
-        : Object.values(dataProduct.entities || {});
-
-      entitiesArray.forEach((canvasNode) => {
-        const nodeId = canvasNode.id;
-
-        const fields = canvasNode.data.fields.map((field) => ({
-          name: field.name,
-          type: field.type || "unknown",
-          isPK: field.isPK || false,
-          calculation: field.calculation || null,
-          ref: field.ref || null,
-        }));
-
-        loadedNodes.push({
-          id: nodeId,
-          type: "tableNode",
-          position: canvasNode.position || {
-            x: 100 + loadedNodes.length * 320,
-            y: 100 + (loadedNodes.length % 3) * 250,
-          },
-          data: {
-            tableName: canvasNode.data.tableName,
-            tableType: canvasNode.data.tableType,
-            fields,
-            selectedFields: [],
-            attributeToggles: {},
-            globalAttributeMode: globalAttributeMode,
-            onAddField: handleAddField,
-            onRemoveField: handleRemoveField,
-            onDeleteTable: handleDeleteTable,
-            onTogglePK: handleTogglePK,
-            onShowReverseDeps: handleShowReverseDeps,
-            onFieldClick: handleFieldClick,
-            onToggleFieldSelection: handleToggleFieldSelection,
-            onOpenSettings: handleOpenSettings,
-          },
-        });
-      });
-
-      const relationships = Array.isArray(dataProduct.relationships)
-        ? dataProduct.relationships
-        : [];
-
-      relationships.forEach((rel) => {
-        const sourceNode = loadedNodes.find((n) => n.id === rel.source);
-        const targetNode = loadedNodes.find((n) => n.id === rel.target);
-
-        if (sourceNode && targetNode) {
-          const sourceHandle = rel.sourceHandle || `${rel.data?.sourceField}-source`;
-          const targetHandle = rel.targetHandle || `${rel.data?.targetField}-target`;
-          const connectionType = rel.data?.connectionType || "ref";
-          const color = connectionType === "calculation" ? "#3b82f6" : "#ef4444";
-
-          loadedEdges.push({
-            id: rel.id || makeEdgeId(),
-            source: sourceNode.id,
-            target: targetNode.id,
-            sourceHandle,
-            targetHandle,
-            type: "smoothstep",
-            animated: false,
-            style: { stroke: color, strokeWidth: 2 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color,
-            },
-            data: { connectionType },
-          });
-        }
-      });
-
-      setNodes(loadedNodes);
-      setEdges(loadedEdges);
-
-      if (dataProduct.availableTables) {
-        setTableMetadata(dataProduct.availableTables.tableMetadata || {});
-        setFileBaseTables(dataProduct.availableTables.fileBaseTables || []);
-        setFileViewTables(dataProduct.availableTables.fileViewTables || []);
-        setFileCteTables(dataProduct.availableTables.fileCteTables || []);
-        setCustomTables(
-          dataProduct.availableTables.customTables || {
-            BASE: [],
-            CTE: [],
-            VIEW: [],
-          }
-        );
-      }
-
-      setSidebarOpen(true);
-    } catch (error) {
-      console.error("Error loading data product:", error);
-      alert("Error loading data product: " + error.message);
-    }
-  };
-
-  const onConnect = useCallback(
-    (params) => {
-      const exists = edges.some(
-        (e) =>
-          e.source === params.source &&
-          e.target === params.target &&
-          e.sourceHandle === params.sourceHandle &&
-          e.targetHandle === params.targetHandle
-      );
-
-      if (exists) {
-        alert("A connection between these fields already exists.");
-        return;
-      }
-
-      const color = "#ef4444";
-
-      const newEdge = {
-        ...params,
-        id: makeEdgeId(),
-        type: "smoothstep",
-        animated: true,
-        markerEnd: { type: MarkerType.ArrowClosed, color },
-        data: { connectionType: "ref" },
-        style: { stroke: color, strokeWidth: 2 },
-      };
-
-      setEdges((eds) => addEdge(newEdge, eds));
-    },
-    [edges, setEdges]
-  );
-
-  const onDragOver = useCallback((event) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
-
-  const onDrop = useCallback(
-    async (event) => {
-      event.preventDefault();
-
-      const tableData = event.dataTransfer.getData("application/reactflow");
-
-      if (!tableData) {
-        return;
-      }
-
-      const { tableName, tableType } = JSON.parse(tableData);
-
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      addTableToCanvas(tableName, tableType, [], position, tableMetadata);
-    },
-    [reactFlowInstance, tableMetadata]
-  );
-
-  const onPaneClick = useCallback(() => {
-    setSelectedEdge(null);
-    setEdges((eds) =>
-      eds.map((e) => {
-        const connectionType = e.data?.connectionType || "ref";
-        const color = connectionType === "calculation" ? "#3b82f6" : "#ef4444";
-        return {
-          ...e,
-          style: { stroke: color, strokeWidth: 2 },
-          animated: true,
-        };
-      })
-    );
-  }, [setEdges]);
-
-  const deleteSelectedEdge = useCallback(() => {
-    if (selectedEdge) {
-      setEdges((eds) => eds.filter((e) => e.id !== selectedEdge));
-      setSelectedEdge(null);
-    }
-  }, [selectedEdge, setEdges]);
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "Delete" && selectedEdge) {
-        event.preventDefault();
-        deleteSelectedEdge();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedEdge, deleteSelectedEdge]);
-
-  const handleAddField = useCallback((nodeId) => {
-    setAddFieldNodeId(nodeId);
-    setShowAddFieldDialog(true);
-  }, []);
-
-  const handleConfirmAddField = useCallback(() => {
-    if (!newFieldName.trim()) return;
-
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === addFieldNodeId) {
-          const updatedNode = {
-            ...node,
-            data: {
-              ...node.data,
-              fields: [
-                ...node.data.fields,
-                {
-                  name: newFieldName,
-                  type: newFieldType,
-                  ref: null,
-                  calculation: null,
-                },
-              ],
-            },
-          };
-
-          const metadataKey = `${node.data.tableType}_${node.data.tableName}`;
-          setTableMetadata((prev) => ({
-            ...prev,
-            [metadataKey]: {
-              name: node.data.tableName,
-              type: node.data.tableType,
-              fields: updatedNode.data.fields.map((f) => ({
-                name: f.name,
-                type: f.type || "VARCHAR",
-                ref: f.ref || null,
-                calculation: f.calculation || null,
-              })),
-            },
-          }));
-          return updatedNode;
-        }
-        return node;
-      })
-    );
-
-    setShowAddFieldDialog(false);
-    setNewFieldName("");
-    setNewFieldType("VARCHAR");
-    setAddFieldNodeId(null);
-  }, [newFieldName, newFieldType, addFieldNodeId, setNodes]);
-
-  const handleRemoveField = useCallback((nodeId, fieldName) => {
-    if (window.confirm(`Remove field "${fieldName}"?`)) {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === nodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                fields: node.data.fields.filter((f) => f.name !== fieldName),
-              },
-            };
-          }
-          return node;
-        })
-      );
-      setEdges((eds) =>
-        eds.filter(
-          (e) =>
-            !(
-              (e.source === nodeId && e.sourceHandle === `${fieldName}-source`) ||
-              (e.target === nodeId && e.targetHandle === `${fieldName}-target`)
-            )
-        )
-      );
-    }
-  }, [setNodes, setEdges]);
-
-  const handleTogglePK = useCallback(
-    (nodeId, fieldName) => {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === nodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                fields: node.data.fields.map((field) =>
-                  field.name === fieldName
-                    ? { ...field, isPK: !field.isPK }
-                    : field
-                ),
-              },
-            };
-          }
-          return node;
-        })
-      );
-    },
-    [setNodes]
-  );
-
-  const handleFieldClick = useCallback((fieldName, field, nodeId) => {
-    let expression = "";
-    if (field?.calculation?.expression) {
-      expression = field.calculation.expression;
-    }
-    setCalculationFieldNodeId(nodeId);
-    setCalculationFieldName(fieldName);
-    setCalculationExpression(expression);
-    setShowCalculationDialog(true);
-  }, []);
-
-  const handleSaveCalculation = useCallback(() => {
-    if (calculationFieldNodeId && calculationFieldName) {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === calculationFieldNodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                fields: node.data.fields.map((field) =>
-                  field.name === calculationFieldName
-                    ? {
-                        ...field,
-                        calculation: calculationExpression !== '' ? {
-                          ...field.calculation,
-                          expression: calculationExpression,
-                        } : null,
-                      }
-                    : field
-                ),
-              },
-            };
-          }
-          return node;
-        })
-      );
-    }
-    setShowCalculationDialog(false);
-    setCalculationExpression("");
-    setCalculationFieldNodeId(null);
-    setCalculationFieldName(null);
-  }, [calculationExpression, calculationFieldNodeId, calculationFieldName, setNodes]);
-
-  const handleToggleFieldSelection = useCallback((nodeId, fieldName) => {
-    const toggleKey = `${nodeId}_${fieldName}`;
-    setAttributeToggles((prev) => ({
-      ...prev,
-      [toggleKey]: !prev[toggleKey],
-    }));
-  }, []);
-
-  const handleOpenSettings = useCallback((nodeId) => {
-    setNodes((currentNodes) => {
-      const node = currentNodes.find((n) => n.id === nodeId);
-      if (!node) return currentNodes;
-
-      const selectedFieldsForNode = node.data.selectedFields || [];
-      const selectedFieldsData = node.data.fields.filter((f) =>
-        selectedFieldsForNode.includes(f.name)
-      );
-
-      const entityMode = entityAttributeModesRef.current[nodeId] || "runtime";
-      setGlobalAttributeMode(entityMode);
-
-      setAttributeToggles((prev) => {
-        const initialToggles = {};
-        node.data.fields.forEach((field) => {
-          const toggleKey = `${nodeId}_${field.name}`;
-          if (prev[toggleKey] === undefined) {
-            const fieldMode = field.attributeMode || entityMode;
-            const shouldToggle = fieldMode !== entityMode;
-            initialToggles[toggleKey] = shouldToggle;
-          }
-        });
-        return Object.keys(initialToggles).length > 0
-          ? { ...prev, ...initialToggles }
-          : prev;
-      });
-
-      setSettingsData({
-        nodeId,
-        sourceEntityName: node.data.tableName,
-        fields: selectedFieldsData,
-        allFields: node.data.fields,
-      });
-      setNewEntityName("");
-      setNewEntityType("CTE");
-      setAttributeSearchQuery("");
-      setAttributeSelections({});
-      setShowSettingsDialog(true);
-
-      return currentNodes;
-    });
-  }, []);
-
-  const handleDeleteTable = useCallback((nodeId) => {
-    if (window.confirm("Delete this table?")) {
-      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-      setEdges((eds) =>
-        eds.filter((e) => e.source !== nodeId && e.target !== nodeId)
-      );
-    }
-  }, [setNodes, setEdges]);
-
+  // Define handleShowReverseDeps early so it can be used in node data
   const handleShowReverseDeps = async (nodeId, tableName, tableType) => {
     try {
       const entityKey = `${tableType}_${tableName}`;
@@ -1166,188 +619,1457 @@ const DataProductPage = () => {
     }
   };
 
-  const handleCreateByMode = useCallback(() => {
-    if (!newEntityName.trim() || !settingsData.nodeId) {
-      alert("Please enter an entity name");
-      return;
-    }
+  useEffect(() => {
+    console.log("Nodes updated:", nodes);
+  }, [nodes]);
 
-    const filteredFields = settingsData.allFields.filter((field) => {
-      if (tab1FilterMode === "both") return true;
-      const toggleKey = `${settingsData.nodeId}_${field.name}`;
-      const isToggled = attributeToggles[toggleKey] || false;
-      const effectiveMode = isToggled
-        ? globalAttributeMode === "runtime" ? "loadtime" : "runtime"
-        : globalAttributeMode;
-      return effectiveMode === tab1FilterMode;
-    });
+  useEffect(() => {
+    console.log("Edges updated:", edges);
+  }, [edges]);
 
-    if (filteredFields.length === 0) {
-      alert(`No ${tab1FilterMode} attributes found to create entity`);
-      return;
-    }
+  useEffect(() => {
+    console.log("table Metadata updated:", tableMetadata);
+  }, [tableMetadata]);
 
-    const newNodeId = makeNodeId();
-    const newNode = {
-      id: newNodeId,
-      type: "tableNode",
-      position: {
-        x: Math.random() * 300 + 100,
-        y: Math.random() * 300 + 100,
-      },
-      data: {
-        tableName: newEntityName,
-        tableType: newEntityType,
-        fields: filteredFields,
-        iscustom: true,
-        selectedFields: [],
-        attributeToggles: {},
-        globalAttributeMode: globalAttributeMode,
-        onAddField: handleAddField,
-        onRemoveField: handleRemoveField,
-        onDeleteTable: handleDeleteTable,
-        onTogglePK: handleTogglePK,
-        onShowReverseDeps: handleShowReverseDeps,
-        onFieldClick: handleFieldClick,
-        onToggleFieldSelection: handleToggleFieldSelection,
-        onOpenSettings: handleOpenSettings,
-      },
-    };
+  useEffect(() => {
+    console.log("customTables updated:", customTables);
+  }, [customTables]);
 
-    setNodes((nds) => [...nds, newNode]);
+  useEffect(() => {
+    entityAttributeModesRef.current = entityAttributeModes;
+  }, [entityAttributeModes]);
 
-    const metadataKey = `${newEntityType}_${newEntityName}`;
-    setTableMetadata((prev) => ({
-      ...prev,
-      [metadataKey]: {
-        name: newEntityName,
-        type: newEntityType,
-        fields: filteredFields,
-        iscustom: true,
-      },
-    }));
-
-    setCustomTables((prev) => ({
-      ...prev,
-      [newEntityType]: [...prev[newEntityType], newEntityName],
-    }));
-
-    setShowSettingsDialog(false);
-    setNewEntityName("");
-    setNewEntityType("CTE");
-  }, [newEntityName, newEntityType, settingsData, tab1FilterMode, attributeToggles, globalAttributeMode, handleAddField, handleRemoveField, handleDeleteTable, handleTogglePK, handleShowReverseDeps, handleFieldClick, handleToggleFieldSelection, handleOpenSettings, setNodes, setTableMetadata, setCustomTables]);
-
-  const handleCreateFromSelected = useCallback(() => {
-    if (!newEntityName.trim() || !settingsData.nodeId) {
-      alert("Please enter an entity name");
-      return;
-    }
-
-    const selectedFields = settingsData.allFields.filter(
-      (f) => attributeSelections[f.name]
+  useEffect(() => {
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        const entityMode = entityAttributeModes[node.id] || "runtime";
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            attributeToggles,
+            globalAttributeMode: entityMode,
+          },
+        };
+      })
     );
+  }, [attributeToggles, entityAttributeModes]);
 
-    if (selectedFields.length === 0) {
-      alert("Please select at least one attribute");
-      return;
+  useEffect(() => {
+    if (dataProductData) {
+      loadDataProduct(dataProductData);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!dataProductData && selectedFileIds.length > 0) {
+      loadTableMetadata();
+    }
+  }, [selectedFileIds]);
+
+  const onLayout = useCallback(() => {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = applyLayout(
+      nodes,
+      edges,
+      "dagre",
+      "LR"
+    );
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+  }, [nodes, edges, setNodes, setEdges]);
+
+  useEffect(() => {
+    if (nodes.length > 0 && edges.length >= 0) {
+      const timer = setTimeout(() => {
+        onLayout();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const loadTableMetadata = async () => {
+    const metadata = {};
+    const baseTables = new Set();
+    const viewTables = new Set();
+    const cteTables = new Set();
+    const combinedEntities = {};
+
+    for (const fileId of selectedFileIds) {
+      try {
+        const fileData = await getFile(fileId, "sql", "individual");
+        if (fileData && fileData.data && fileData.data.entities) {
+          Object.assign(combinedEntities, fileData.data.entities);
+
+          for (const entityName in fileData.data.entities) {
+            if (entityName.startsWith("BASE_")) {
+              const baseName = entityName.replace("BASE_", "");
+              baseTables.add(baseName);
+              const entity = fileData.data.entities[entityName];
+              const metadataKey = `BASE_${baseName}`;
+              if (!metadata[metadataKey]) {
+                metadata[metadataKey] = {
+                  name: baseName,
+                  type: "BASE",
+                  fields: [],
+                };
+              }
+              if (entity.fields) {
+                for (const fieldName in entity.fields) {
+                  const field = entity.fields[fieldName];
+                  if (
+                    !metadata[metadataKey].fields.some(
+                      (f) => f.name === fieldName
+                    )
+                  ) {
+                    metadata[metadataKey].fields.push({
+                      name: fieldName,
+                      type: field.type || "unknown",
+                      ref: field.ref || null,
+                      isPK: field.isPK || false,
+                      calculation: field.calculation || null,
+                    });
+                  }
+                }
+              }
+              metadata[metadataKey].iscustom = false;
+            } else if (entityName.startsWith("VIEW_")) {
+              const viewName = entityName.replace("VIEW_", "");
+              viewTables.add(viewName);
+              const entity = fileData.data.entities[entityName];
+              const metadataKey = `VIEW_${viewName}`;
+              if (!metadata[metadataKey]) {
+                metadata[metadataKey] = {
+                  name: viewName,
+                  type: "VIEW",
+                  fields: [],
+                };
+              }
+              if (entity.fields) {
+                for (const fieldName in entity.fields) {
+                  const field = entity.fields[fieldName];
+                  if (
+                    !metadata[metadataKey].fields.some(
+                      (f) => f.name === fieldName
+                    )
+                  ) {
+                    metadata[metadataKey].fields.push({
+                      name: fieldName,
+                      type: field.type || "unknown",
+                      ref: field.ref || null,
+                      isPK: field.isPK || false,
+                      calculation: field.calculation || null,
+                    });
+                  }
+                }
+              }
+              metadata[metadataKey].iscustom = false;
+            } else if (entityName.startsWith("CTE_")) {
+              const cteName = entityName.replace("CTE_", "");
+              cteTables.add(cteName);
+              const entity = fileData.data.entities[entityName];
+              const metadataKey = `CTE_${cteName}`;
+              if (!metadata[metadataKey]) {
+                metadata[metadataKey] = {
+                  name: cteName,
+                  type: "CTE",
+                  fields: [],
+                };
+              }
+              if (entity.fields) {
+                for (const fieldName in entity.fields) {
+                  const field = entity.fields[fieldName];
+                  if (
+                    !metadata[metadataKey].fields.some(
+                      (f) => f.name === fieldName
+                    )
+                  ) {
+                    metadata[metadataKey].fields.push({
+                      name: fieldName,
+                      type: field.type || "unknown",
+                      ref: field.ref || null,
+                      isPK: field.isPK || false,
+                      calculation: field.calculation || null,
+                    });
+                  }
+                }
+              }
+              metadata[metadataKey].iscustom = false;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading metadata for file ${fileId}:`, error);
+      }
     }
 
-    const newNodeId = makeNodeId();
-    const newNode = {
-      id: newNodeId,
-      type: "tableNode",
-      position: {
-        x: Math.random() * 300 + 100,
-        y: Math.random() * 300 + 100,
-      },
-      data: {
-        tableName: newEntityName,
-        tableType: newEntityType,
-        fields: selectedFields,
-        iscustom: true,
-        selectedFields: [],
-        attributeToggles: {},
-        globalAttributeMode: globalAttributeMode,
-        onAddField: handleAddField,
-        onRemoveField: handleRemoveField,
-        onDeleteTable: handleDeleteTable,
-        onTogglePK: handleTogglePK,
-        onShowReverseDeps: handleShowReverseDeps,
-        onFieldClick: handleFieldClick,
-        onToggleFieldSelection: handleToggleFieldSelection,
-        onOpenSettings: handleOpenSettings,
-      },
-    };
+    setTableMetadata(metadata);
+    setFileBaseTables(Array.from(baseTables).sort());
+    setFileViewTables(Array.from(viewTables).sort());
+    setFileCteTables(Array.from(cteTables).sort());
 
-    setNodes((nds) => [...nds, newNode]);
+    if (Object.keys(combinedEntities).length > 0) {
+      setSourceDataProduct({
+        entities: combinedEntities,
+        metadata: { name: "Selected Files" },
+      });
+    }
+  };
 
-    const metadataKey = `${newEntityType}_${newEntityName}`;
-    setTableMetadata((prev) => ({
-      ...prev,
-      [metadataKey]: {
-        name: newEntityName,
-        type: newEntityType,
-        fields: selectedFields,
-        iscustom: true,
-      },
-    }));
+  const loadDataProduct = (dataProduct) => {
+    try {
+      setSourceDataProduct(dataProduct || null);
 
-    setCustomTables((prev) => ({
-      ...prev,
-      [newEntityType]: [...prev[newEntityType], newEntityName],
-    }));
+      const loadedNodes = [];
+      const loadedEdges = [];
+      const nodeMap = new Map();
 
-    setShowSettingsDialog(false);
-    setNewEntityName("");
-    setNewEntityType("CTE");
-  }, [newEntityName, newEntityType, settingsData, attributeSelections, globalAttributeMode, handleAddField, handleRemoveField, handleDeleteTable, handleTogglePK, handleShowReverseDeps, handleFieldClick, handleToggleFieldSelection, handleOpenSettings, setNodes, setTableMetadata, setCustomTables]);
+      const savedEntityModes = dataProduct.entityAttributeModes || {};
+      const savedToggles = dataProduct.attributeToggles || {};
+      const defaultMode = dataProduct.globalAttributeMode || "runtime";
 
-  const onEdgeClick = useCallback((event, edge) => {
-    setSelectedEdge(edge.id);
-    setSelectedEdgeDetails(edge);
+      const entitiesArray = Array.isArray(dataProduct.entities)
+        ? dataProduct.entities
+        : Object.values(dataProduct.entities || {});
+
+      const entityKeyMap = new Map();
+      entitiesArray.forEach((canvasNode) => {
+        const entityKey = `${canvasNode.data.tableType}_${canvasNode.data.tableName}`;
+        entityKeyMap.set(canvasNode.id, entityKey);
+      });
+
+      entitiesArray.forEach((canvasNode) => {
+        const nodeId = canvasNode.id;
+        const entityKey = `${canvasNode.data.tableType}_${canvasNode.data.tableName}`;
+
+        nodeMap.set(entityKey, nodeId);
+
+        const entityMode = savedEntityModes[nodeId] || defaultMode;
+
+        const fields = canvasNode.data.fields.map((field) => {
+          const toggleKey = `${nodeId}_${field.name}`;
+          const isToggled = savedToggles[toggleKey] || false;
+          const attributeMode = isToggled
+            ? entityMode === "runtime"
+              ? "loadtime"
+              : "runtime"
+            : entityMode;
+
+          return {
+            name: field.name,
+            type: field.type || "unknown",
+            attributeMode: field.attributeMode || attributeMode,
+            isPK: field.isPK || false,
+            calculation: field.calculation || null,
+            ref: field.ref || null,
+          };
+        });
+
+        loadedNodes.push({
+          id: nodeId,
+          type: "tableNode",
+          position: canvasNode.position || {
+            x: 100 + loadedNodes.length * 320,
+            y: 100 + (loadedNodes.length % 3) * 250,
+          },
+          data: {
+            tableName: canvasNode.data.tableName,
+            tableType: canvasNode.data.tableType,
+            fields,
+            attributeToggles: savedToggles,
+            globalAttributeMode: entityMode,
+            onAddField: handleAddField,
+            onRemoveField: handleRemoveField,
+            onDeleteTable: handleDeleteTable,
+            onTogglePK: handleTogglePK,
+            onShowReverseDeps: handleShowReverseDeps,
+            onToggleFieldSelection: handleToggleFieldSelection,
+            onOpenSettings: handleOpenSettings,
+            onFieldClick: handleFieldClick,
+            selectedFields: [],
+          },
+        });
+      });
+
+      const relationships = Array.isArray(dataProduct.relationships)
+        ? dataProduct.relationships
+        : [];
+
+      relationships.forEach((rel, idx) => {
+        const sourceNode = loadedNodes.find((n) => n.id === rel.source);
+        const targetNode = loadedNodes.find((n) => n.id === rel.target);
+
+        if (sourceNode && targetNode) {
+          const sourceHandle =
+            rel.sourceHandle || `${rel.data?.sourceField}-source`;
+          const targetHandle =
+            rel.targetHandle || `${rel.data?.targetField}-target`;
+          const connectionType = rel.data?.connectionType || "ref";
+          const color =
+            connectionType === "calculation" ? "#3b82f6" : "#ef4444";
+
+          loadedEdges.push({
+            id: rel.id || makeEdgeId(),
+            source: sourceNode.id,
+            target: targetNode.id,
+            sourceHandle,
+            targetHandle,
+            type: "smoothstep",
+            animated: false,
+            style: { stroke: color, strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color,
+            },
+            data: { connectionType },
+          });
+        }
+      });
+
+      setNodes(loadedNodes);
+      setEdges(loadedEdges);
+
+      if (dataProduct.availableTables) {
+        setTableMetadata(dataProduct.availableTables.tableMetadata || {});
+        setFileBaseTables(dataProduct.availableTables.fileBaseTables || []);
+        setFileViewTables(dataProduct.availableTables.fileViewTables || []);
+        setFileCteTables(dataProduct.availableTables.fileCteTables || []);
+        setCustomTables(
+          dataProduct.availableTables.customTables || {
+            BASE: [],
+            CTE: [],
+            VIEW: [],
+          }
+        );
+      }
+
+      if (savedEntityModes && Object.keys(savedEntityModes).length > 0) {
+        setEntityAttributeModes(savedEntityModes);
+      }
+
+      setSidebarOpen(true);
+    } catch (error) {
+      console.error("Error loading data product:", error);
+      alert("Error loading data product: " + error.message);
+    }
+  };
+
+  const onConnect = useCallback(
+    (params) => {
+      // Check if an explicit connection between these exact handles already exists
+      const exists = edges.some(
+        (e) =>
+          e.source === params.source &&
+          e.target === params.target &&
+          e.sourceHandle === params.sourceHandle &&
+          e.targetHandle === params.targetHandle
+      );
+
+      // If edge already exists, prevent duplicate connection
+      if (exists) {
+        alert("A connection between these fields already exists.");
+        return;
+      }
+
+      // Determine whether the target field already has a calculation
+      const targetNode = nodes.find((n) => n.id === params.target);
+      const targetFieldName = params.targetHandle
+        ? params.targetHandle.replace("-target", "")
+        : null;
+      const targetField = targetNode?.data?.fields?.find(
+        (f) => f.name === targetFieldName
+      );
+      const targetHasCalculation = !!(targetField && targetField.calculation);
+
+      // Default connection type: calculation if target field has a calculation, otherwise ref
+      const defaultType = targetHasCalculation ? "calculation" : "ref";
+      const color = defaultType === "calculation" ? "#3b82f6" : "#ef4444";
+
+      // Prepare a tentative edge object and show the dialog. The dialog
+      // will call handleChangeConnectionType to either add the edge or
+      // update an existing one.
+      const tentativeEdge = {
+        ...params,
+        id: makeEdgeId(),
+        type: "smoothstep",
+        animated: true,
+        markerEnd: { type: MarkerType.ArrowClosed, color },
+        data: { connectionType: defaultType },
+        style: { stroke: color, strokeWidth: 2 },
+      };
+
+      // Add tentative edge to canvas immediately
+      setEdges((eds) => addEdge(tentativeEdge, eds));
+
+      // Store tentative details so the dialog can act on them. Always
+      // show the dialog so the user confirms the type.
+      setSelectedEdgeDetails(tentativeEdge);
+      setShowConnectionTypeDialog(true);
+    },
+    [edges, nodes, setEdges]
+  );
+
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const onDrop = useCallback(
+    async (event) => {
+      event.preventDefault();
+
+      const tableData = event.dataTransfer.getData("application/reactflow");
+
+      if (!tableData) {
+        return;
+      }
+
+      const { tableName, tableType } = JSON.parse(tableData);
+
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      addTableToCanvas(tableName, tableType, [], position, tableMetadata);
+    },
+    [reactFlowInstance, tableMetadata]
+  );
+
+  const onPaneClick = useCallback(() => {
+    setSelectedEdge(null);
+    setSelectedEdgeDetails(null);
     setEdges((eds) =>
       eds.map((e) => {
-        if (e.id === edge.id) {
-          return {
-            ...e,
-            style: { ...e.style, strokeWidth: 4 },
-            animated: false,
-          };
-        }
         const connectionType = e.data?.connectionType || "ref";
         const color = connectionType === "calculation" ? "#3b82f6" : "#ef4444";
         return {
           ...e,
           style: { stroke: color, strokeWidth: 2 },
           animated: true,
+          markerEnd: { type: MarkerType.ArrowClosed, color }
         };
       })
     );
   }, [setEdges]);
 
-  const handleChangeConnectionType = useCallback((newType) => {
-    if (selectedEdgeDetails) {
-      setEdges((eds) =>
-        eds.map((e) => {
-          if (e.id === selectedEdgeDetails.id) {
-            const color = newType === "calculation" ? "#3b82f6" : "#ef4444";
+  const deleteSelectedEdge = useCallback(() => {
+    if (selectedEdge) {
+      setEdges((eds) => eds.filter((e) => e.id !== selectedEdge));
+      setSelectedEdge(null);
+    }
+  }, [selectedEdge, setEdges]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Delete" && selectedEdge) {
+        event.preventDefault();
+        deleteSelectedEdge();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedEdge, deleteSelectedEdge]);
+
+  const handleAddField = useCallback((nodeId) => {
+    setAddFieldNodeId(nodeId);
+    setShowAddFieldDialog(true);
+  }, []);
+
+  const handleConfirmAddField = useCallback(() => {
+    if (!newFieldName.trim()) return;
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === addFieldNodeId) {
+          const updatedNode = {
+            ...node,
+            data: {
+              ...node.data,
+              fields: [
+                ...node.data.fields,
+                {
+                  name: newFieldName,
+                  type: newFieldType,
+                  ref: null,
+                  calculation: null,
+                },
+              ],
+            },
+          };
+
+          const metadataKey = `${node.data.tableType}_${node.data.tableName}`;
+          setTableMetadata((prev) => ({
+            ...prev,
+            [metadataKey]: {
+              name: node.data.tableName,
+              type: node.data.tableType,
+              fields: updatedNode.data.fields.map((f) => ({
+                name: f.name,
+                type: f.type || "VARCHAR",
+                ref: f.ref || null,
+                calculation: f.calculation || null,
+              })),
+            },
+          }));
+          return updatedNode;
+        }
+        return node;
+      })
+    );
+
+    setShowAddFieldDialog(false);
+    setNewFieldName("");
+    setNewFieldType("VARCHAR");
+    setAddFieldNodeId(null);
+  }, [newFieldName, newFieldType, addFieldNodeId, setNodes]);
+
+  const handleRemoveField = useCallback(
+    (nodeId, fieldName) => {
+      if (window.confirm(`Remove field "${fieldName}"?`)) {
+        setNodes((nds) =>
+          nds.map((node) => {
+            if (node.id === nodeId) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  fields: node.data.fields.filter((f) => f.name !== fieldName),
+                },
+              };
+            }
+            return node;
+          })
+        );
+        setEdges((eds) =>
+          eds.filter(
+            (e) =>
+              !(
+                (e.source === nodeId &&
+                  e.sourceHandle === `${fieldName}-source`) ||
+                (e.target === nodeId &&
+                  e.targetHandle === `${fieldName}-target`)
+              )
+          )
+        );
+      }
+    },
+    [setNodes, setEdges]
+  );
+
+  const handleToggleFieldSelection = useCallback(
+    (nodeId, fieldName) => {
+      setAttributeToggles((prev) => {
+        const toggleKey = `${nodeId}_${fieldName}`;
+        const currentToggle = prev[toggleKey] || false;
+        return {
+          ...prev,
+          [toggleKey]: !currentToggle,
+        };
+      });
+
+      setSelectedFields((prev) => {
+        const nodeSelections = prev[nodeId] || [];
+        const isSelected = nodeSelections.includes(fieldName);
+
+        const newSelections = {
+          ...prev,
+          [nodeId]: isSelected
+            ? nodeSelections.filter((f) => f !== fieldName)
+            : [...nodeSelections, fieldName],
+        };
+
+        setNodes((nds) =>
+          nds.map((node) => {
+            if (node.id === nodeId) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  selectedFields: newSelections[nodeId],
+                },
+              };
+            }
+            return node;
+          })
+        );
+
+        return newSelections;
+      });
+    },
+    [setNodes]
+  );
+
+  const handleCreateFromSelection = useCallback(
+    (nodeId, selectedFieldNames) => {
+      setNodes((currentNodes) => {
+        const node = currentNodes.find((n) => n.id === nodeId);
+
+        if (!node) {
+          return currentNodes;
+        }
+
+        const selectedFieldsData = node.data.fields.filter((f) =>
+          selectedFieldNames.includes(f.name)
+        );
+
+        const initialToggles = {};
+        node.data.fields.forEach((field) => {
+          initialToggles[`${nodeId}_${field.name}`] = (
+            node.data.selectedFields || []
+          ).includes(field.name);
+        });
+        setAttributeToggles((prev) => ({ ...prev, ...initialToggles }));
+
+        setSettingsData({
+          nodeId,
+          sourceEntityName: node.data.tableName,
+          fields: selectedFieldsData,
+          allFields: node.data.fields,
+        });
+        setNewEntityName("");
+        setNewEntityType("CTE");
+        setSearchQuery("");
+        setSettingsActiveTab("byMode");
+        setShowSettingsDialog(true);
+
+        return currentNodes;
+      });
+    },
+    []
+  );
+
+  const handleTogglePK = useCallback(
+    (nodeId, fieldName) => {
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === nodeId) {
             return {
-              ...e,
-              data: { ...e.data, connectionType: newType },
-              style: { ...e.style, stroke: color },
-              markerEnd: {
-                ...e.markerEnd,
-                color,
+              ...node,
+              data: {
+                ...node.data,
+                fields: node.data.fields.map((field) =>
+                  field.name === fieldName
+                    ? { ...field, isPK: !field.isPK }
+                    : field
+                ),
               },
             };
           }
-          return e;
+          return node;
+        })
+      );
+    },
+    [setNodes]
+  );
+
+  const handleFieldClick = useCallback((fieldName, field, nodeId) => {
+    let expression = "";
+    if (field?.calculation?.expression) {
+      expression = field.calculation.expression;
+    }
+    setCalculationFieldNodeId(nodeId);
+    setCalculationFieldName(fieldName);
+    setCalculationExpression(expression);
+    setShowCalculationDialog(true);
+  }, []);
+
+  const handleSaveCalculation = useCallback(() => {
+    // Update calculation only in the corresponding field in nodes (not in edge data)
+    if (calculationFieldNodeId && calculationFieldName) {
+      console.log("Saving calculation expression:", calculationExpression);
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === calculationFieldNodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                fields: node.data.fields.map((field) =>
+                  field.name === calculationFieldName
+                    ? {
+                        ...field,
+                        calculation:
+                          calculationExpression !== ""
+                            ? {
+                                ...field.calculation,
+                                expression: calculationExpression,
+                              }
+                            : null,
+                      }
+                    : field
+                ),
+              },
+            };
+          }
+          return node;
         })
       );
     }
-    setShowConnectionTypeDialog(false);
-    setSelectedEdgeDetails(null);
-  }, [selectedEdgeDetails, setEdges]);
+
+    setShowCalculationDialog(false);
+    setCalculationExpression("");
+    setCalculationFieldNodeId(null);
+    setCalculationFieldName(null);
+  }, [
+    nodes,
+    calculationExpression,
+    setNodes,
+    calculationFieldNodeId,
+    calculationFieldName,
+  ]);
+
+  const handleEditCalculation = useCallback(() => {
+    if (selectedEdgeDetails?.data?.connectionType === "calculation") {
+      // Calculation is now stored in node field data, not in edge data
+      // Empty expression to start - user will edit from field click context
+      setCalculationExpression("");
+      setShowCalculationDialog(true);
+    }
+  }, [selectedEdgeDetails]);
+
+  const handleOpenSettings = useCallback((nodeId) => {
+    setNodes((currentNodes) => {
+      const node = currentNodes.find((n) => n.id === nodeId);
+
+      if (!node) {
+        return currentNodes;
+      }
+
+      const selectedFieldsForNode = node.data.selectedFields || [];
+      const selectedFieldsData = node.data.fields.filter((f) =>
+        selectedFieldsForNode.includes(f.name)
+      );
+
+      const entityMode = entityAttributeModesRef.current[nodeId] || "runtime";
+      setGlobalAttributeMode(entityMode);
+
+      setAttributeToggles((prev) => {
+        const initialToggles = {};
+        node.data.fields.forEach((field) => {
+          const toggleKey = `${nodeId}_${field.name}`;
+          if (prev[toggleKey] === undefined) {
+            const fieldMode = field.attributeMode || entityMode;
+            const shouldToggle = fieldMode !== entityMode;
+            initialToggles[toggleKey] = shouldToggle;
+          }
+        });
+        return Object.keys(initialToggles).length > 0
+          ? { ...prev, ...initialToggles }
+          : prev;
+      });
+
+      setSettingsData({
+        nodeId,
+        sourceEntityName: node.data.tableName,
+        fields: selectedFieldsData,
+        allFields: node.data.fields,
+      });
+      setNewEntityName("");
+      setNewEntityType("CTE");
+      setSearchQuery("");
+      setAttributeSearchQuery("");
+      setAttributeSelections({});
+      setSettingsActiveTab("byMode");
+      setShowSettingsDialog(true);
+
+      return currentNodes;
+    });
+  }, []);
+
+  const handleConfirmRemoveField = useCallback(() => {
+    const { nodeId, fieldName } = deleteFieldInfo;
+
+    setEdges((eds) =>
+      eds.filter(
+        (edge) =>
+          !edge.sourceHandle?.includes(fieldName) &&
+          !edge.targetHandle?.includes(fieldName)
+      )
+    );
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          const updatedNode = {
+            ...node,
+            data: {
+              ...node.data,
+              fields: node.data.fields.filter((f) => f.name !== fieldName),
+            },
+          };
+
+          const metadataKey = `${node.data.tableType}_${node.data.tableName}`;
+          setTableMetadata((prev) => ({
+            ...prev,
+            [metadataKey]: {
+              name: node.data.tableName,
+              type: node.data.tableType,
+              fields: updatedNode.data.fields.map((f) => ({
+                name: f.name,
+                type: f.type || "VARCHAR",
+                ref: f.ref || null,
+                calculation: f.calculation || null,
+              })),
+            },
+          }));
+
+          return updatedNode;
+        }
+        return node;
+      })
+    );
+
+    setShowDeleteFieldConfirm(false);
+    setDeleteFieldInfo({ nodeId: null, fieldName: null });
+  }, [deleteFieldInfo, setNodes, setEdges]);
+
+  const handleDeleteTable = useCallback(
+    (nodeId) => {
+      if (!window.confirm("Delete this table?")) return;
+
+      const nodeToDelete = nodes.find((n) => n.id === nodeId);
+
+      setEdges((eds) =>
+        eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+      );
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+
+      if (nodeToDelete) {
+        const metadataKey = `${nodeToDelete.data.tableType}_${nodeToDelete.data.tableName}`;
+        setTableMetadata((prev) => {
+          const updated = { ...prev };
+          delete updated[metadataKey];
+          return updated;
+        });
+
+        setCustomTables((prev) => ({
+          ...prev,
+          [nodeToDelete.data.tableType]: prev[
+            nodeToDelete.data.tableType
+          ].filter((t) => t !== nodeToDelete.data.tableName),
+        }));
+      }
+
+      setTimeout(() => {
+        if (showReverseDepsDialog && selectedEntityForReverseDeps) {
+          handleShowReverseDeps(
+            selectedEntityForReverseDeps.nodeId,
+            selectedEntityForReverseDeps.tableName,
+            selectedEntityForReverseDeps.tableType
+          );
+        }
+        if (showSuggestDialog) {
+          generateSuggestions(
+            nodes.filter((n) => n.id !== nodeId),
+            sourceDataProduct
+          );
+        }
+      }, 100);
+    },
+    [
+      setNodes,
+      setEdges,
+      nodes,
+      showReverseDepsDialog,
+      selectedEntityForReverseDeps,
+      showSuggestDialog,
+      handleShowReverseDeps,
+      generateSuggestions,
+      sourceDataProduct,
+    ]
+  );
+
+  const handleCreateByMode = useCallback(() => {
+    if (!newEntityName.trim()) {
+      alert("Please enter an entity name");
+      return;
+    }
+
+    const entityExists = nodes.some(
+      (n) =>
+        n.data.tableName === newEntityName && n.data.tableType === newEntityType
+    );
+
+    if (entityExists) {
+      alert(
+        `Entity "${newEntityName}" (${newEntityType}) already exists on canvas!`
+      );
+      return;
+    }
+
+    const sourceNode = nodes.find((n) => n.id === settingsData.nodeId);
+
+    const entityMode = globalAttributeMode;
+
+    const fieldsToUse = settingsData.allFields
+      .filter((f) => {
+        const toggleKey = `${settingsData.nodeId}_${f.name}`;
+        const isToggled = attributeToggles[toggleKey] || false;
+        const fieldAttributeMode = isToggled
+          ? entityMode === "runtime"
+            ? "loadtime"
+            : "runtime"
+          : entityMode;
+
+        if (tab1FilterMode === "both") {
+          return true;
+        } else {
+          return fieldAttributeMode === tab1FilterMode;
+        }
+      })
+      .map((f) => {
+        const toggleKey = `${settingsData.nodeId}_${f.name}`;
+        const isToggled = attributeToggles[toggleKey] || false;
+        const attributeMode = isToggled
+          ? entityMode === "runtime"
+            ? "loadtime"
+            : "runtime"
+          : entityMode;
+
+        const sourceField = sourceNode?.data.fields.find(
+          (sf) => sf.name === f.name
+        );
+        const isPK = sourceField?.isPK || false;
+
+        return { ...f, isPK };
+      });
+
+    const newNodeId = makeNodeId();
+    const newNode = {
+      id: newNodeId,
+      type: "tableNode",
+      position: {
+        x: Math.random() * 300 + 100,
+        y: Math.random() * 300 + 100,
+      },
+      data: {
+        tableName: newEntityName,
+        tableType: newEntityType,
+        fields: fieldsToUse,
+        iscustom: true,
+        selectedFields: [],
+        attributeToggles: {},
+        globalAttributeMode: globalAttributeMode,
+        onAddField: handleAddField,
+        onRemoveField: handleRemoveField,
+        onTogglePK: handleTogglePK,
+        onToggleFieldSelection: handleToggleFieldSelection,
+        onFieldClick: handleFieldClick,
+      },
+    };
+
+    setNodes((nds) => {
+      const updatedNodes = [...nds, newNode];
+
+      return updatedNodes.map((node) => {
+        if (node.id === newNodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onShowReverseDeps: (nodeId, tableName, tableType) =>
+                handleShowReverseDeps(nodeId, tableName, tableType),
+              onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
+              onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
+            },
+          };
+        }
+        return node;
+      });
+    });
+
+    setEntityAttributeModes((prev) => ({
+      ...prev,
+      [newNodeId]: entityMode,
+    }));
+
+    setAttributeToggles((prev) => {
+      const newToggles = { ...prev };
+      fieldsToUse.forEach((field) => {
+        const sourceToggleKey = `${settingsData.nodeId}_${field.name}`;
+        const newToggleKey = `${newNodeId}_${field.name}`;
+        if (prev[sourceToggleKey] !== undefined) {
+          newToggles[newToggleKey] = prev[sourceToggleKey];
+        }
+      });
+      return newToggles;
+    });
+
+    const edgesToCopy = [];
+    const sourceNodeId = settingsData.nodeId;
+
+    fieldsToUse.forEach((field, idx) => {
+      const outgoingEdges = edges.filter(
+        (e) =>
+          e.source === sourceNodeId && e.sourceHandle === `${field.name}-source`
+      );
+
+      outgoingEdges.forEach((sourceEdge, edgeIdx) => {
+        edgesToCopy.push({
+          field: field.name,
+          idx: `${idx}-${edgeIdx}`,
+          target: sourceEdge.target,
+          targetHandle: sourceEdge.targetHandle,
+          connectionType: sourceEdge.data?.connectionType || "ref",
+          type: "outgoing",
+        });
+      });
+
+      const incomingEdges = edges.filter(
+        (e) =>
+          e.target === sourceNodeId && e.targetHandle === `${field.name}-target`
+      );
+
+      incomingEdges.forEach((incomingEdge, edgeIdx) => {
+        edgesToCopy.push({
+          field: field.name,
+          idx: `${idx}-${edgeIdx}`,
+          source: incomingEdge.source,
+          sourceHandle: incomingEdge.sourceHandle,
+          connectionType: incomingEdge.data?.connectionType || "ref",
+          type: "incoming",
+        });
+      });
+    });
+
+    setTimeout(() => {
+      if (edgesToCopy.length > 0) {
+        const newEdges = edgesToCopy.map((edgeInfo) => {
+          if (edgeInfo.type === "outgoing") {
+            return {
+              id: makeEdgeId(),
+              source: newNodeId,
+              target: edgeInfo.target,
+              sourceHandle: `${edgeInfo.field}-source`,
+              targetHandle: edgeInfo.targetHandle,
+              type: "smoothstep",
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed },
+              data: {
+                connectionType: edgeInfo.connectionType,
+              },
+              style: {
+                stroke:
+                  edgeInfo.connectionType === "calculation"
+                    ? "#3b82f6"
+                    : "#ef4444",
+                strokeWidth: 2,
+              },
+            };
+          } else {
+            return {
+              id: makeEdgeId(),
+              source: edgeInfo.source,
+              target: newNodeId,
+              sourceHandle: edgeInfo.sourceHandle,
+              targetHandle: `${edgeInfo.field}-target`,
+              type: "smoothstep",
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed },
+              data: {
+                connectionType: edgeInfo.connectionType,
+              },
+              style: {
+                stroke:
+                  edgeInfo.connectionType === "calculation"
+                    ? "#3b82f6"
+                    : "#ef4444",
+                strokeWidth: 2,
+              },
+            };
+          }
+        });
+
+        setEdges((eds) => {
+          const updated = [...eds, ...newEdges];
+          return updated;
+        });
+      }
+    }, 100);
+
+    setSelectedFields((prev) => ({
+      ...prev,
+      [settingsData.nodeId]: [],
+    }));
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === settingsData.nodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              selectedFields: [],
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    if (newEntityType === "BASE") {
+      if (!fileBaseTables.includes(newEntityName)) {
+        setFileBaseTables((prev) => [...prev, newEntityName]);
+      }
+    } else if (newEntityType === "VIEW") {
+      if (!fileViewTables.includes(newEntityName)) {
+        setFileViewTables((prev) => [...prev, newEntityName]);
+      }
+    } else if (newEntityType === "CTE") {
+      setCustomTables((prev) => ({
+        ...prev,
+        CTE: [...prev.CTE, newEntityName],
+      }));
+    }
+
+    setShowSettingsDialog(false);
+  }, [
+    newEntityName,
+    newEntityType,
+    nodes,
+    settingsData,
+    globalAttributeMode,
+    attributeToggles,
+    edges,
+    handleAddField,
+    handleRemoveField,
+    handleTogglePK,
+    handleToggleFieldSelection,
+    fileBaseTables,
+    fileViewTables,
+    setNodes,
+    setEdges,
+    setCustomTables,
+    setFileBaseTables,
+    setFileViewTables,
+    tab1FilterMode,
+    handleShowReverseDeps,
+    handleDeleteTable,
+    handleOpenSettings,
+    handleFieldClick,
+  ]);
+
+  const handleCreateFromSelected = useCallback(() => {
+    if (!newEntityName.trim()) {
+      alert("Please enter an entity name");
+      return;
+    }
+
+    const entityExists = nodes.some(
+      (n) =>
+        n.data.tableName === newEntityName && n.data.tableType === newEntityType
+    );
+
+    if (entityExists) {
+      alert(
+        `Entity "${newEntityName}" (${newEntityType}) already exists on canvas!`
+      );
+      return;
+    }
+
+    const sourceNode = nodes.find((n) => n.id === settingsData.nodeId);
+
+    const entityMode = globalAttributeMode;
+
+    const selectedFields = settingsData.allFields
+      ? settingsData.allFields.filter((f) => attributeSelections[f.name])
+      : [];
+
+    if (selectedFields.length === 0) {
+      alert("Please select at least one attribute");
+      return;
+    }
+
+    const fieldsToUse = selectedFields.map((f) => {
+      const toggleKey = `${settingsData.nodeId}_${f.name}`;
+      const isToggled = attributeToggles[toggleKey] || false;
+
+      const sourceField = sourceNode?.data.fields.find(
+        (sf) => sf.name === f.name
+      );
+      const isPK = sourceField?.isPK || false;
+
+      return { ...f, isPK };
+    });
+
+    const newNodeId = makeNodeId();
+
+    const newNode = {
+      id: newNodeId,
+      type: "tableNode",
+      position: {
+        x: Math.random() * 300 + 100,
+        y: Math.random() * 300 + 100,
+      },
+      data: {
+        tableName: newEntityName,
+        tableType: newEntityType,
+        fields: fieldsToUse,
+        iscustom: true,
+        selectedFields: [],
+        attributeToggles: {},
+        globalAttributeMode: globalAttributeMode,
+        onAddField: handleAddField,
+        onRemoveField: handleRemoveField,
+        onTogglePK: handleTogglePK,
+        onToggleFieldSelection: handleToggleFieldSelection,
+        onFieldClick: handleFieldClick,
+      },
+    };
+
+    setNodes((nds) => {
+      const updatedNodes = [...nds, newNode];
+
+      return updatedNodes.map((node) => {
+        if (node.id === newNodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onShowReverseDeps: (nodeId, tableName, tableType) =>
+                handleShowReverseDeps(nodeId, tableName, tableType),
+              onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
+              onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
+            },
+          };
+        }
+        return node;
+      });
+    });
+
+    setEntityAttributeModes((prev) => ({
+      ...prev,
+      [newNodeId]: entityMode,
+    }));
+
+    setAttributeToggles((prev) => {
+      const newToggles = { ...prev };
+      fieldsToUse.forEach((field) => {
+        const sourceToggleKey = `${settingsData.nodeId}_${field.name}`;
+        const newToggleKey = `${newNodeId}_${field.name}`;
+        if (prev[sourceToggleKey] !== undefined) {
+          newToggles[newToggleKey] = prev[sourceToggleKey];
+        }
+      });
+      return newToggles;
+    });
+
+    const edgesToCopy = [];
+    const sourceNodeId = settingsData.nodeId;
+
+    fieldsToUse.forEach((field, idx) => {
+      const outgoingEdges = edges.filter(
+        (e) =>
+          e.source === sourceNodeId && e.sourceHandle === `${field.name}-source`
+      );
+
+      outgoingEdges.forEach((sourceEdge, edgeIdx) => {
+        edgesToCopy.push({
+          field: field.name,
+          idx: `${idx}-${edgeIdx}`,
+          target: sourceEdge.target,
+          targetHandle: sourceEdge.targetHandle,
+          connectionType: sourceEdge.data?.connectionType || "ref",
+          type: "outgoing",
+        });
+      });
+
+      const incomingEdges = edges.filter(
+        (e) =>
+          e.target === sourceNodeId && e.targetHandle === `${field.name}-target`
+      );
+
+      incomingEdges.forEach((incomingEdge, edgeIdx) => {
+        edgesToCopy.push({
+          field: field.name,
+          idx: `${idx}-${edgeIdx}`,
+          source: incomingEdge.source,
+          sourceHandle: incomingEdge.sourceHandle,
+          connectionType: incomingEdge.data?.connectionType || "ref",
+          type: "incoming",
+        });
+      });
+    });
+
+    setTimeout(() => {
+      if (edgesToCopy.length > 0) {
+        const newEdges = edgesToCopy.map((edgeInfo) => {
+          if (edgeInfo.type === "outgoing") {
+            return {
+              id: makeEdgeId(),
+              source: newNodeId,
+              target: edgeInfo.target,
+              sourceHandle: `${edgeInfo.field}-source`,
+              targetHandle: edgeInfo.targetHandle,
+              type: "smoothstep",
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed },
+              data: {
+                connectionType: edgeInfo.connectionType,
+              },
+              style: {
+                stroke:
+                  edgeInfo.connectionType === "calculation"
+                    ? "#3b82f6"
+                    : "#ef4444",
+                strokeWidth: 2,
+              },
+            };
+          } else {
+            return {
+              id: makeEdgeId(),
+              source: edgeInfo.source,
+              target: newNodeId,
+              sourceHandle: edgeInfo.sourceHandle,
+              targetHandle: `${edgeInfo.field}-target`,
+              type: "smoothstep",
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed },
+              data: {
+                connectionType: edgeInfo.connectionType,
+              },
+              style: {
+                stroke:
+                  edgeInfo.connectionType === "calculation"
+                    ? "#3b82f6"
+                    : "#ef4444",
+                strokeWidth: 2,
+              },
+            };
+          }
+        });
+
+        setEdges((eds) => [...eds, ...newEdges]);
+      }
+    }, 100);
+
+    if (newEntityType === "BASE") {
+      if (!fileBaseTables.includes(newEntityName)) {
+        setFileBaseTables((prev) => [...prev, newEntityName]);
+      }
+    } else if (newEntityType === "VIEW") {
+      if (!fileViewTables.includes(newEntityName)) {
+        setFileViewTables((prev) => [...prev, newEntityName]);
+      }
+    } else if (newEntityType === "CTE") {
+      setCustomTables((prev) => ({
+        ...prev,
+        CTE: [...prev.CTE, newEntityName],
+      }));
+    }
+
+    setShowSettingsDialog(false);
+  }, [
+    newEntityName,
+    newEntityType,
+    nodes,
+    settingsData,
+    globalAttributeMode,
+    attributeToggles,
+    attributeSelections,
+    edges,
+    handleAddField,
+    handleRemoveField,
+    handleTogglePK,
+    handleToggleFieldSelection,
+    fileBaseTables,
+    fileViewTables,
+    setNodes,
+    setEdges,
+    setCustomTables,
+    setFileBaseTables,
+    setFileViewTables,
+    handleShowReverseDeps,
+    handleDeleteTable,
+    handleOpenSettings,
+    handleFieldClick,
+  ]);
+
+  const onEdgeClick = useCallback(
+    (event, edge) => {
+      event.stopPropagation();
+      setSelectedEdge(edge.id);
+      setSelectedEdgeDetails(edge);
+      // Highlight the selected edge
+      setEdges((eds) =>
+        eds.map((e) => {
+          const isSelected = e.id === edge.id;
+          const connectionType = e.data?.connectionType || "ref";
+          const baseColor =
+            connectionType === "calculation" ? "#3b82f6" : "#ef4444";
+          return {
+            ...e,
+            style: {
+              stroke: isSelected ? "#fbbf24" : baseColor,
+              strokeWidth: isSelected ? 3 : 2,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: isSelected ? "#fbbf24" : baseColor,
+            },
+            animated: isSelected,
+          };
+        })
+      );
+    },
+    [setEdges]
+  );
+
+  const handleChangeConnectionType = useCallback(
+    (newType) => {
+      // If editing an existing selected edge, update it.
+      if (selectedEdge) {
+        setEdges((eds) =>
+          eds.map((e) => {
+            if (e.id === selectedEdge) {
+              const color = newType === "calculation" ? "#3b82f6" : "#ef4444";
+              return {
+                ...e,
+                data: { connectionType: newType },
+                style: { stroke: color, strokeWidth: 3 },
+                markerEnd: {
+                  type: MarkerType.ArrowClosed,
+                  color: color,
+                },
+              };
+            }
+            return e;
+          })
+        );
+        setSelectedEdgeDetails((prev) =>
+          prev ? { ...prev, data: { connectionType: newType } } : null
+        );
+        setShowConnectionTypeDialog(false);
+        return;
+      }
+
+      // If we have tentative connection details (from onConnect), create the new edge
+      if (selectedEdgeDetails) {
+        const edgeColor = newType === "calculation" ? "#3b82f6" : "#ef4444";
+        const newEdge = {
+          ...selectedEdgeDetails,
+          id: selectedEdgeDetails.id || makeEdgeId(),
+          type: "smoothstep",
+          animated: true,
+          data: { connectionType: newType },
+          style: {
+            stroke: edgeColor,
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: edgeColor,
+          },
+        };
+
+        setEdges((eds) => addEdge(newEdge, eds));
+        setSelectedEdge(newEdge.id);
+        setSelectedEdgeDetails(newEdge);
+      }
+
+      setShowConnectionTypeDialog(false);
+    },
+    [selectedEdge, selectedEdgeDetails, edges]
+  );
 
   const handleExport = useCallback(() => {
     const dataProduct = {
@@ -1369,7 +2091,16 @@ const DataProductPage = () => {
     };
     setExportJson(JSON.stringify(dataProduct, null, 2));
     setShowExportDialog(true);
-  }, [nodes, edges, currentDataProductName, tableMetadata, fileBaseTables, fileCteTables, fileViewTables, customTables]);
+  }, [
+    nodes,
+    edges,
+    currentDataProductName,
+    tableMetadata,
+    fileBaseTables,
+    fileCteTables,
+    fileViewTables,
+    customTables,
+  ]);
 
   const addTableToCanvas = (
     tableName,
@@ -1399,23 +2130,23 @@ const DataProductPage = () => {
         x: Math.random() * 300 + 100,
         y: Math.random() * 300 + 100,
       },
-        data: {
-          tableName: tableName,
-          tableType: actualType,
-          fields: finalFields,
-          iscustom: table?.iscustom,
-          selectedFields: [],
-          attributeToggles: {},
-          globalAttributeMode: globalAttributeMode,
-          onAddField: handleAddField,
-          onRemoveField: handleRemoveField,
-          onDeleteTable: handleDeleteTable,
-          onTogglePK: handleTogglePK,
-          onShowReverseDeps: handleShowReverseDeps,
-          onFieldClick: handleFieldClick,
-          onToggleFieldSelection: handleToggleFieldSelection,
-          onOpenSettings: handleOpenSettings,
-        },
+      data: {
+        tableName: tableName,
+        tableType: actualType,
+        fields: finalFields,
+        iscustom: table?.iscustom,
+        selectedFields: [],
+        attributeToggles: {},
+        globalAttributeMode: globalAttributeMode,
+        onAddField: handleAddField,
+        onRemoveField: handleRemoveField,
+        onDeleteTable: handleDeleteTable,
+        onTogglePK: handleTogglePK,
+        onShowReverseDeps: handleShowReverseDeps,
+        onFieldClick: handleFieldClick,
+        onToggleFieldSelection: handleToggleFieldSelection,
+        onOpenSettings: handleOpenSettings,
+      },
     };
 
     setNodes((nds) => [...nds, newNode]);
@@ -1504,7 +2235,7 @@ const DataProductPage = () => {
         finalFileName,
         dataProduct,
         currentDataProductId,
-        'sql'
+        "sql"
       );
 
       setCurrentDataProductName(finalFileName);
@@ -1524,22 +2255,34 @@ const DataProductPage = () => {
 
   const handleAddSuggestedEntity = async (suggestion) => {
     try {
-      const checkEntityName = suggestion.entityName.replace(/^(BASE_|CTE_|VIEW_)/, "");
-      const checkEntityType = suggestion.entityType || (suggestion.entityName.startsWith("CTE_") ? "CTE" : "VIEW");
-      
+      const checkEntityName = suggestion.entityName.replace(
+        /^(BASE_|CTE_|VIEW_)/,
+        ""
+      );
+      const checkEntityType =
+        suggestion.entityType ||
+        (suggestion.entityName.startsWith("CTE_") ? "CTE" : "VIEW");
+
       const entityExists = nodes.some(
-        (n) => n.data.tableName === checkEntityName && n.data.tableType === checkEntityType
+        (n) =>
+          n.data.tableName === checkEntityName &&
+          n.data.tableType === checkEntityType
       );
 
       if (entityExists) {
-        alert(`Entity "${checkEntityName}" (${checkEntityType}) already exists on canvas!`);
+        alert(
+          `Entity "${checkEntityName}" (${checkEntityType}) already exists on canvas!`
+        );
         return;
       }
 
       const sourceEntities = sourceDataProduct?.entities || {};
       // Construct the full entity key with prefix
       const fullEntityKey = `${checkEntityType}_${checkEntityName}`;
-      const entity = suggestion.entityData || sourceEntities[fullEntityKey] || sourceEntities[suggestion.entityName];
+      const entity =
+        suggestion.entityData ||
+        sourceEntities[fullEntityKey] ||
+        sourceEntities[suggestion.entityName];
 
       if (!entity) {
         alert("Entity not found in data product source");
@@ -1547,7 +2290,11 @@ const DataProductPage = () => {
       }
 
       let addedNodes = [];
-      if (suggestion.coveragePercent < 100 && suggestion.missingEntities && suggestion.missingEntities.length > 0) {
+      if (
+        suggestion.coveragePercent < 100 &&
+        suggestion.missingEntities &&
+        suggestion.missingEntities.length > 0
+      ) {
         for (const missingEntity of suggestion.missingEntities) {
           // Construct the full entity key for missing entities
           const missingEntityFullKey = `${missingEntity.type}_${missingEntity.name}`;
@@ -1561,13 +2308,16 @@ const DataProductPage = () => {
                   calculation: f.calculation || null,
                   isPK: f.isPK || false,
                 }))
-              : Object.keys(missingEntityData.fields || {}).map((fieldName) => ({
-                  name: fieldName,
-                  type: missingEntityData.fields[fieldName].type || "unknown",
-                  ref: missingEntityData.fields[fieldName].ref || null,
-                  calculation: missingEntityData.fields[fieldName].calculation || null,
-                  isPK: missingEntityData.fields[fieldName].isPK || false,
-                }));
+              : Object.keys(missingEntityData.fields || {}).map(
+                  (fieldName) => ({
+                    name: fieldName,
+                    type: missingEntityData.fields[fieldName].type || "unknown",
+                    ref: missingEntityData.fields[fieldName].ref || null,
+                    calculation:
+                      missingEntityData.fields[fieldName].calculation || null,
+                    isPK: missingEntityData.fields[fieldName].isPK || false,
+                  })
+                );
 
             const missingNodeId = makeNodeId();
             const missingNode = {
@@ -1681,14 +2431,17 @@ const DataProductPage = () => {
         Object.keys(suggestion.dependencyMap).forEach((dependentEntityKey) => {
           const connections = suggestion.dependencyMap[dependentEntityKey];
           const depEntityType = dependentEntityKey.split("_")[0];
-          const depEntityName = dependentEntityKey.substring(depEntityType.length + 1);
+          const depEntityName = dependentEntityKey.substring(
+            depEntityType.length + 1
+          );
 
           const sourceNode = updatedNodes.find((n) => {
             const nodeEntityKey = `${n.data.tableType}_${n.data.tableName}`;
             return (
               nodeEntityKey === dependentEntityKey ||
               n.data.entityKey === dependentEntityKey ||
-              (n.data.tableType === depEntityType && n.data.tableName === depEntityName)
+              (n.data.tableType === depEntityType &&
+                n.data.tableName === depEntityName)
             );
           });
 
@@ -1702,7 +2455,8 @@ const DataProductPage = () => {
               );
 
               if (sourceFieldActual && targetFieldActual) {
-                const edgeColor = conn.connectionType === "calculation" ? "#3b82f6" : "#ef4444";
+                const edgeColor =
+                  conn.connectionType === "calculation" ? "#3b82f6" : "#ef4444";
                 const edgeId = makeEdgeId();
 
                 newEdges.push({
@@ -1724,8 +2478,20 @@ const DataProductPage = () => {
                     connectionType: conn.connectionType,
                   },
                 });
+              } else {
+                console.debug(
+                  `Skipping edge: source field "${
+                    conn.sourceField
+                  }" exists=${!!sourceFieldActual}, target field "${
+                    conn.targetField
+                  }" exists=${!!targetFieldActual}`
+                );
               }
             });
+          } else {
+            console.debug(
+              `Source node not found for dependency ${dependentEntityKey} - skipping edge creation`
+            );
           }
         });
       }
@@ -1733,12 +2499,8 @@ const DataProductPage = () => {
       const updatedEdges = [...edges, ...newEdges];
 
       // Apply layout to the updated nodes and edges
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyLayout(
-        updatedNodes,
-        updatedEdges,
-        "dagre",
-        "LR"
-      );
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(updatedNodes, updatedEdges, "LR");
 
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
@@ -1752,15 +2514,22 @@ const DataProductPage = () => {
 
   const handleAddReverseDep = async (suggestion) => {
     try {
-      const checkEntityName = suggestion.entityName.replace(/^(BASE_|CTE_|VIEW_)/, "");
+      const checkEntityName = suggestion.entityName.replace(
+        /^(BASE_|CTE_|VIEW_)/,
+        ""
+      );
       const checkEntityType = suggestion.entityType;
 
       const entityExists = nodes.some(
-        (n) => n.data.tableName === checkEntityName && n.data.tableType === checkEntityType
+        (n) =>
+          n.data.tableName === checkEntityName &&
+          n.data.tableType === checkEntityType
       );
 
       if (entityExists) {
-        alert(`Entity "${checkEntityName}" (${checkEntityType}) already exists on canvas!`);
+        alert(
+          `Entity "${checkEntityName}" (${checkEntityType}) already exists on canvas!`
+        );
         return;
       }
 
@@ -1827,7 +2596,11 @@ const DataProductPage = () => {
 
       const newEdges = [];
 
-      if (suggestion.dependencyMap && selectedEntityForReverseDeps && targetNode) {
+      if (
+        suggestion.dependencyMap &&
+        selectedEntityForReverseDeps &&
+        targetNode
+      ) {
         Object.keys(suggestion.dependencyMap).forEach((dependentEntityKey) => {
           const connections = suggestion.dependencyMap[dependentEntityKey];
 
@@ -1840,7 +2613,8 @@ const DataProductPage = () => {
             );
 
             if (hasSourceField && hasTargetField) {
-              const edgeColor = conn.connectionType === "calculation" ? "#3b82f6" : "#ef4444";
+              const edgeColor =
+                conn.connectionType === "calculation" ? "#3b82f6" : "#ef4444";
 
               newEdges.push({
                 id: makeEdgeId(),
@@ -1884,12 +2658,8 @@ const DataProductPage = () => {
       const updatedEdges = [...edges, ...newEdges];
 
       // Apply layout to the updated nodes and edges
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyLayout(
-        updatedNodes,
-        updatedEdges,
-        "dagre",
-        "LR"
-      );
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(updatedNodes, updatedEdges, "LR");
 
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
@@ -1910,7 +2680,15 @@ const DataProductPage = () => {
   };
 
   return (
-    <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
           padding: "12px 16px",
@@ -1945,21 +2723,6 @@ const DataProductPage = () => {
           </h2>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              padding: "8px 12px",
-              background: "#f3f4f6",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            {sidebarOpen ? <FiChevronsLeft size={16} /> : <FiChevronsRight size={16} />}
-          </button>
           <button
             onClick={handleSuggest}
             style={{
@@ -2060,7 +2823,31 @@ const DataProductPage = () => {
           onCreateNewEntity={handleCreateNewTable}
         />
 
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              position: "absolute",
+              top: "16px",
+              left: "16px",
+              padding: "8px 12px",
+              background: "#f3f4f6",
+              border: "1px solid #d1d5db",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              zIndex: 5,
+            }}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {sidebarOpen ? (
+              <FiChevronsLeft size={16} />
+            ) : (
+              <FiChevronsRight size={16} />
+            )}
+          </button>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -2072,12 +2859,111 @@ const DataProductPage = () => {
             onPaneClick={onPaneClick}
             onEdgeClick={onEdgeClick}
             nodeTypes={nodeTypes}
-            fitView
+            defaultEdgeOptions={{
+              type: "smoothstep",
+              animated: true,
+              style: { strokeWidth: 2 },
+            }}
+            minZoom={0.1}
+            maxZoom={4}
+            translateExtent={[
+              [-Infinity, -Infinity],
+              [Infinity, Infinity],
+            ]}
+            nodeExtent={[
+              [-Infinity, -Infinity],
+              [Infinity, Infinity],
+            ]}
           >
             <Background />
             <Controls />
-            <MiniMap />
+            <MiniMap nodeColor="#3b82f6" maskColor="rgba(0, 0, 0, 0.1)" />
+            <Background variant="dots" gap={12} size={1} />
           </ReactFlow>
+
+          {selectedEdge && (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                right: "16px",
+                zIndex: 10,
+                display: "flex",
+                gap: "8px",
+              }}
+            >
+              <button
+                onClick={() => setShowConnectionTypeDialog(true)}
+                style={{
+                  background: "white",
+                  border:
+                    selectedEdgeDetails?.data?.connectionType === "calculation"
+                      ? "2px solid #8b5cf6"
+                      : "2px solid #3b82f6",
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color:
+                    selectedEdgeDetails?.data?.connectionType === "calculation"
+                      ? "#8b5cf6"
+                      : "#3b82f6",
+                  boxShadow:
+                    selectedEdgeDetails?.data?.connectionType === "calculation"
+                      ? "0 4px 8px rgba(139, 92, 246, 0.3)"
+                      : "0 4px 8px rgba(59, 130, 246, 0.3)",
+                  transition: "all 200ms ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background =
+                    selectedEdgeDetails?.data?.connectionType === "calculation"
+                      ? "#f3e8ff"
+                      : "#eff6ff";
+                  e.target.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "white";
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
+                <FiEdit2 size={16} />
+                Change Type
+              </button>
+              <button
+                onClick={deleteSelectedEdge}
+                style={{
+                  background: "#ef4444",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "white",
+                  boxShadow: "0 4px 8px rgba(239, 68, 68, 0.3)",
+                  transition: "all 200ms ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = "#dc2626";
+                  e.target.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "#ef4444";
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
+                <FiTrash2 size={16} />
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2132,7 +3018,13 @@ const DataProductPage = () => {
               <option value="DATE">DATE</option>
               <option value="BOOLEAN">BOOLEAN</option>
             </select>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 onClick={() => {
                   setShowAddFieldDialog(false);
@@ -2220,6 +3112,8 @@ const DataProductPage = () => {
         setTab1FilterMode={setTab1FilterMode}
         attributeSearchQuery={attributeSearchQuery}
         setAttributeSearchQuery={setAttributeSearchQuery}
+        activeTab={settingsActiveTab}
+        setActiveTab={setSettingsActiveTab}
         onCreateByMode={handleCreateByMode}
         onCreateFromSelected={handleCreateFromSelected}
       />
@@ -2250,4 +3144,3 @@ const DataProductPageWrapper = () => (
 );
 
 export default DataProductPageWrapper;
-
