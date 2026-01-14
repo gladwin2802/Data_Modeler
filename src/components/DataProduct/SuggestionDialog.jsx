@@ -212,7 +212,9 @@ const SuggestionDialog = ({
                                     {Object.entries(suggestion.dependencyMap).map(([entityKey, connections]) => {
                                         const entityName = entityKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
                                         return connections.map((conn, i) => (
-                                            <div key={`${entityKey}-${i}`} style={{
+                                            <div
+                                              key={`${entityKey}-${i}`}
+                                              style={{
                                                 fontSize: "11px",
                                                 color: "#374151",
                                                 padding: "6px 8px",
@@ -220,24 +222,60 @@ const SuggestionDialog = ({
                                                 borderRadius: "4px",
                                                 display: "flex",
                                                 alignItems: "center",
-                                                gap: "6px"
-                                            }}>
-                                                <span style={{ fontWeight: 600 }}>{entityName}.{conn.sourceField}</span>
-                                                <span style={{ color: conn.connectionType === 'calculation' ? '#8b5cf6' : '#3b82f6', fontSize: "14px" }}>→</span>
-                                                <span style={{ fontWeight: 600 }}>{conn.targetField}</span>
-                                                {conn.connectionType === 'calculation' && (
-                                                    <span style={{
-                                                        marginLeft: 'auto',
-                                                        fontSize: "9px",
-                                                        background: "#8b5cf6",
-                                                        color: "white",
-                                                        padding: "2px 6px",
-                                                        borderRadius: "3px",
-                                                        fontWeight: 700
-                                                    }}>
-                                                        CALC
-                                                    </span>
-                                                )}
+                                                gap: "6px",
+                                                position: "relative",
+                                                minWidth: 0, // allow flex children to shrink
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  fontWeight: 600,
+                                                  maxWidth: "40%",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  whiteSpace: "nowrap",
+                                                  minWidth: 0,
+                                                  display: "inline-block",
+                                                }}
+                                                title={`${entityName}.${conn.sourceField}`}
+                                              >
+                                                {entityName}.{conn.sourceField}
+                                              </span>
+                                              <span style={{ color: conn.connectionType === 'calculation' ? '#8b5cf6' : '#3b82f6', fontSize: "14px" }}>→</span>
+                                              <span
+                                                style={{
+                                                  fontWeight: 600,
+                                                  maxWidth: "40%",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  whiteSpace: "nowrap",
+                                                  minWidth: 0,
+                                                  display: "inline-block",
+                                                }}
+                                                title={conn.targetField}
+                                              >
+                                                {conn.targetField}
+                                              </span>
+                                              {conn.connectionType === 'calculation' && (
+                                                <span
+                                                  style={{
+                                                    marginLeft: "auto",
+                                                    fontSize: "9px",
+                                                    background: "#8b5cf6",
+                                                    color: "white",
+                                                    padding: "2px 6px",
+                                                    borderRadius: "3px",
+                                                    fontWeight: 700,
+                                                    flexShrink: 0,
+                                                    whiteSpace: "nowrap",
+                                                    maxWidth: "50px",
+                                                    textAlign: "center",
+                                                  }}
+                                                  title="Calculated Connection"
+                                                >
+                                                  CALC
+                                                </span>
+                                              )}
                                             </div>
                                         ));
                                     })}

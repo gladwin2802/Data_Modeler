@@ -325,6 +325,8 @@ const TableNode = memo(({ data, id }) => {
                     flex: 1,
                     cursor: "pointer",
                     userSelect: "none",
+                    display: "flex",
+                    gap: "6px",
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -351,7 +353,7 @@ const TableNode = memo(({ data, id }) => {
                   }}
                   title="Click to edit calculation, double-click to set as primary key"
                 >
-                  {field.name}
+                  <span>{field.name}</span>
                   {field.isPK && (
                     <FiKey
                       size={14}
@@ -732,6 +734,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
+              metadata[metadataKey].joins = fileData.data.join || [];
             } else if (entityName.startsWith("VIEW_")) {
               const viewName = entityName.replace("VIEW_", "");
               viewTables.add(viewName);
@@ -763,6 +766,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
+              metadata[metadataKey].joins = fileData.data.join || [];
             } else if (entityName.startsWith("CTE_")) {
               const cteName = entityName.replace("CTE_", "");
               cteTables.add(cteName);
@@ -794,6 +798,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
+              metadata[metadataKey].joins = fileData.data.join || [];
             }
           }
         }
@@ -817,6 +822,7 @@ const DataProductPage = () => {
 
   const loadDataProduct = (dataProduct) => {
     try {
+      console.log("Loading data product:", dataProduct);
       setSourceDataProduct(dataProduct || null);
 
       const loadedNodes = [];
@@ -824,12 +830,19 @@ const DataProductPage = () => {
       const nodeMap = new Map();
 
       const savedEntityModes = dataProduct.entityAttributeModes || {};
-      const savedToggles = dataProduct.attributeToggles || {};
       const defaultMode = dataProduct.globalAttributeMode || "runtime";
 
       const entitiesArray = Array.isArray(dataProduct.entities)
         ? dataProduct.entities
         : Object.values(dataProduct.entities || {});
+
+      // Collect attributeToggles from all entities' data
+      const savedToggles = {};
+      entitiesArray.forEach((entity) => {
+        if (entity.data && entity.data.attributeToggles) {
+          Object.assign(savedToggles, entity.data.attributeToggles);
+        }
+      });
 
       const entityKeyMap = new Map();
       entitiesArray.forEach((canvasNode) => {
@@ -857,7 +870,7 @@ const DataProductPage = () => {
           return {
             name: field.name,
             type: field.type || "unknown",
-            attributeMode: field.attributeMode || attributeMode,
+            // attributeMode: field.attributeMode || attributeMode,
             isPK: field.isPK || false,
             calculation: field.calculation || null,
             ref: field.ref || null,
@@ -885,7 +898,7 @@ const DataProductPage = () => {
             onToggleFieldSelection: handleToggleFieldSelection,
             onOpenSettings: handleOpenSettings,
             onFieldClick: handleFieldClick,
-            selectedFields: [],
+            selectedFields: canvasNode.data.selectedFields || [],
           },
         });
       });
@@ -928,6 +941,14 @@ const DataProductPage = () => {
       setNodes(loadedNodes);
       setEdges(loadedEdges);
 
+      // Set attribute toggles from saved data
+      console.log("Setting attribute toggles:", savedToggles);
+      setAttributeToggles(savedToggles);
+
+      // Set entity attribute modes and global mode
+      setEntityAttributeModes(savedEntityModes);
+      setGlobalAttributeMode(defaultMode);
+
       if (dataProduct.availableTables) {
         setTableMetadata(dataProduct.availableTables.tableMetadata || {});
         setFileBaseTables(dataProduct.availableTables.fileBaseTables || []);
@@ -940,10 +961,6 @@ const DataProductPage = () => {
             VIEW: [],
           }
         );
-      }
-
-      if (savedEntityModes && Object.keys(savedEntityModes).length > 0) {
-        setEntityAttributeModes(savedEntityModes);
       }
 
       setSidebarOpen(true);
@@ -1090,6 +1107,7 @@ const DataProductPage = () => {
                   name: newFieldName,
                   type: newFieldType,
                   ref: null,
+                  isPK: false,
                   calculation: null,
                 },
               ],
@@ -2071,35 +2089,38 @@ const DataProductPage = () => {
   );
 
   const handleExport = useCallback(() => {
-    const dataProduct = {
-      entities: nodes,
-      relationships: edges,
-      metadata: {
-        name: currentDataProductName || "untitled",
-        created: new Date().toISOString(),
-        tableCount: nodes.length,
-        connectionCount: edges.length,
-      },
-      availableTables: {
-        tableMetadata,
-        fileBaseTables,
-        fileCteTables,
-        fileViewTables,
-        customTables,
-      },
+
+    const exportnode = nodes.map((node) => {
+      return {
+          id: node.id,
+          Name: node.data.tableName,
+          Type: node.data.tableType,
+          fields: node.data.fields.map(field => {
+            const fieldObj = { name: field.name };
+            if (field.ref !== null) fieldObj.ref = field.ref;
+            if (field.calculation !== null) fieldObj.calculation = field.calculation;
+            return fieldObj;
+          }),
+      };
+    });
+
+    const exportedge = edges.map((edge) => {
+      return {
+          source: edge.source,
+          sourceHandle: edge.sourceHandle.replace("-source", ""),
+          target: edge.target,
+          targetHandle: edge.targetHandle.replace("-target", ""),
+          connectionType: edge.data?.connectionType==="calculation" ? "Calculation" : "Reference",
+        };
+    });
+
+    const exportobj = {
+      Entities: exportnode,
+      Relationships: exportedge,
     };
-    setExportJson(JSON.stringify(dataProduct, null, 2));
+    setExportJson(JSON.stringify(exportobj, null, 2));
     setShowExportDialog(true);
-  }, [
-    nodes,
-    edges,
-    currentDataProductName,
-    tableMetadata,
-    fileBaseTables,
-    fileCteTables,
-    fileViewTables,
-    customTables,
-  ]);
+  }, [ nodes, edges ]);
 
   const addTableToCanvas = (
     tableName,
@@ -2248,8 +2269,8 @@ const DataProductPage = () => {
     }
   };
 
-  const handleSuggest = async () => {
-    await generateSuggestions(nodes, sourceDataProduct);
+  const handleSuggest = async () => {;
+    await generateSuggestions(nodes, tableMetadata);
   };
 
   const handleAddSuggestedEntity = async (suggestion) => {
@@ -2678,7 +2699,7 @@ const DataProductPage = () => {
     }
   };
 
-  return (
+    return (
     <div
       style={{
         width: "100vw",
@@ -3011,6 +3032,7 @@ const DataProductPage = () => {
                 borderRadius: "4px",
               }}
             >
+              <option value="UNKNOWN">UNKNOWN</option>
               <option value="VARCHAR">VARCHAR</option>
               <option value="INT">INT</option>
               <option value="FLOAT">FLOAT</option>

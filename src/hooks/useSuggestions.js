@@ -6,8 +6,9 @@ export const useSuggestions = () => {
 
     const generateSuggestions = async (nodes, entitySource) => {
         try {
-            const sourceEntities = entitySource?.entities || {};
-            const sourceName = entitySource?.metadata?.name || 'Data Product';
+            console.log("Current nodes:", nodes);
+            console.log("Source data product:", entitySource);  // tableMetadata
+            const sourceEntities = entitySource || {};
 
             if (!entitySource || Object.keys(sourceEntities).length === 0) {
                 alert('No data product entities available for suggestions.');
@@ -17,7 +18,7 @@ export const useSuggestions = () => {
             const canvasTables = nodes.map(node => ({
                 name: node.data.tableName,
                 type: node.data.tableType,
-                fields: node.data.fields.map(f => f.name),
+                fields: node.data.fields,
                 fullKey: `${node.data.tableType}_${node.data.tableName}`
             }));
 
@@ -34,7 +35,7 @@ export const useSuggestions = () => {
                 if (!entityKey.startsWith('CTE_') && !entityKey.startsWith('VIEW_')) continue;
 
                 const entity = sourceEntities[entityKey];
-                const entityFields = Object.keys(entity.fields || {});
+                const entityFields = Object.values(entity.fields || {});
                 if (entityFields.length === 0) continue;
 
                 const referencedEntities = new Set();
@@ -42,8 +43,10 @@ export const useSuggestions = () => {
                 const dependencyMap = {}; // Map of dependent entities to their connection details
                 const dependencyTypes = {}; // Track the type of each dependency (BASE, CTE, VIEW)
                 
-                entityFields.forEach(fieldName => {
-                    const fieldData = entity.fields[fieldName];
+                console.log("entityFields for", entityKey, ":", entityFields);
+                entityFields.forEach(fieldObj => {
+                    const fieldName = fieldObj.name;
+                    const fieldData = fieldObj;
                     
                     const processRefs = (refs, isCalculation = false) => {
                         if (refs && Array.isArray(refs)) {
@@ -102,7 +105,7 @@ export const useSuggestions = () => {
                         entityName: entityKey,
                         alias: entity.alias || entityKey,
                         entityType: entityKey.startsWith('CTE_') ? 'CTE' : 'VIEW',
-                        sourceFile: sourceName,
+                        sourceFile: "Unknown", // Placeholder, can be enhanced to track source files
                         matchingTables: Array.from(referencedEntities).map(e => e.replace(/^(BASE_|CTE_|VIEW_)/, '')),
                         coveragePercent,
                         missingEntities: missingEntitiesWithTypes,

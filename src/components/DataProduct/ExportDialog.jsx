@@ -52,7 +52,7 @@ const ExportDialog = ({
           padding: "24px",
           zIndex: 1000,
           width: "700px",
-          maxHeight: "80vh",
+          height: "80vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",

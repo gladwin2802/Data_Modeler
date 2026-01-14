@@ -382,50 +382,72 @@ const SettingsDialog = ({
                     border: "1px solid #bfdbfe",
                     marginBottom: "12px",
                   }}>
-                    {selectedFieldsList.map((field, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          padding: "4px 8px",
-                          margin: "2px",
-                          fontSize: "12px",
-                          backgroundColor: "#dbeafe",
-                          borderRadius: "4px",
-                          color: "#1e40af",
-                          fontFamily: "monospace",
-                        }}
-                      >
-                        {nodes.some((node) => node.data.fields.some((f) => f.name === field.name && f.isPK)) && (
-                          <FiKey size={12} style={{ color: "#f59e0b", marginRight: "4px" }} title="Primary Key" />
-                        )}
-                        {field.name}
-                        <button
-                          onClick={() => {
-                            setAttributeSelections((prev) => ({
-                              ...prev,
-                              [field.name]: false,
-                            }));
-                          }}
+                    {selectedFieldsList.map((field, idx) => {
+                      const toggleKey = `${settingsData.nodeId}_${field.name}`;
+                      const isToggled = attributeToggles[toggleKey] || false;
+                      const effectiveMode = isToggled
+                        ? globalAttributeMode === "runtime" ? "loadtime" : "runtime"
+                        : globalAttributeMode;
+
+                      return (
+                        <span
+                          key={idx}
                           style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            padding: "0",
-                            display: "flex",
+                            display: "inline-flex",
                             alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 8px",
+                            margin: "2px",
+                            fontSize: "12px",
+                            backgroundColor: "#dbeafe",
+                            borderRadius: "4px",
                             color: "#1e40af",
-                            fontSize: "14px",
-                            fontWeight: "bold",
+                            fontFamily: "monospace",
                           }}
-                          title="Remove"
                         >
-                          ×
-                        </button>
-                      </span>
-                    ))}
+                          {field.name}
+                          {nodes.some((node) => node.data.fields.some((f) => f.name === field.name && f.isPK)) && (
+                            <FiKey size={12} style={{ color: "#f59e0b", marginRight: "4px" }} title="Primary Key" />
+                          )}
+                          {/* <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              padding: "2px 4px",
+                              borderRadius: "2px",
+                              backgroundColor: effectiveMode === "runtime" ? "#dcfce7" : "#fef3c7",
+                              color: effectiveMode === "runtime" ? "#15803d" : "#92400e",
+                              textTransform: "uppercase",
+                            }}
+                            title={`Attribute Mode: ${effectiveMode}`}
+                          >
+                            {effectiveMode}
+                          </span> */}
+                          <button
+                            onClick={() => {
+                              setAttributeSelections((prev) => ({
+                                ...prev,
+                                [field.name]: false,
+                              }));
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: "0",
+                              display: "flex",
+                              alignItems: "center",
+                              color: "#1e40af",
+                              fontSize: "14px",
+                              fontWeight: "bold",
+                            }}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -457,6 +479,16 @@ const SettingsDialog = ({
                 }}>
                   {filteredFieldsBySearch.map((field, idx) => {
                     const isSelected = attributeSelections[field.name];
+                    const toggleKey = `${settingsData.nodeId}_${field.name}`;
+                    const isToggled = attributeToggles[toggleKey] || false;
+                    const effectiveMode = isToggled
+                      ? globalAttributeMode === "runtime" ? "loadtime" : "runtime"
+                      : globalAttributeMode;
+
+                    const isPKInAnyEntity = nodes.some((node) =>
+                      node.data.fields.some((f) => f.name === field.name && f.isPK)
+                    );
+
                     return (
                       <div
                         key={field.name}
@@ -479,8 +511,26 @@ const SettingsDialog = ({
                           }}
                           style={{ marginRight: "8px", cursor: "pointer" }}
                         />
-                        <span style={{ fontFamily: "monospace", flex: 1 }}>
+                        <span style={{ fontFamily: "monospace", flex: 1, display: "flex", alignItems: "center", gap: "6px" }}>
                           {field.name} <span style={{ color: "#6b7280" }}>({field.type})</span>
+                          {isPKInAnyEntity && (
+                            <FiKey size={12} style={{ color: "#f59e0b", flexShrink: 0 }} title="Primary Key" />
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: "600",
+                            padding: "2px 6px",
+                            borderRadius: "2px",
+                            backgroundColor: effectiveMode === "runtime" ? "#dcfce7" : "#fef3c7",
+                            color: effectiveMode === "runtime" ? "#15803d" : "#92400e",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={`Attribute Mode: ${effectiveMode}`}
+                        >
+                          {effectiveMode}
                         </span>
                       </div>
                     );
