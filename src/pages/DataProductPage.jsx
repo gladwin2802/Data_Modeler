@@ -698,6 +698,7 @@ const DataProductPage = () => {
     for (const fileId of selectedFileIds) {
       try {
         const fileData = await getFile(fileId, "sql", "individual");
+        let joins_available = fileData.data.join || {};
         if (fileData && fileData.data && fileData.data.entities) {
           Object.assign(combinedEntities, fileData.data.entities);
 
@@ -733,7 +734,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
-              metadata[metadataKey].joins = fileData.data.join || [];
+              metadata[metadataKey].joins = joins_available[metadataKey] || [];
             } else if (entityName.startsWith("VIEW_")) {
               const viewName = entityName.replace("VIEW_", "");
               viewTables.add(viewName);
@@ -765,7 +766,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
-              metadata[metadataKey].joins = fileData.data.join || [];
+              metadata[metadataKey].joins = joins_available[metadataKey] || [];
             } else if (entityName.startsWith("CTE_")) {
               const cteName = entityName.replace("CTE_", "");
               cteTables.add(cteName);
@@ -797,7 +798,7 @@ const DataProductPage = () => {
                 }
               }
               metadata[metadataKey].iscustom = false;
-              metadata[metadataKey].joins = fileData.data.join || [];
+              metadata[metadataKey].joins = joins_available[metadataKey] || [];
             }
           }
         }
@@ -2087,12 +2088,9 @@ const DataProductPage = () => {
     customPosition = null,
     tableMetadata = {}
   ) => {
-    console.log("In AddtableToCanvas, nodes initially:", nodes);
     const entityExists = nodes.some(
       (n) => n.data.tableName === tableName && n.data.tableType === tableType
     );
-
-    console.log("In AddtableToCanvas, entityExists:", entityExists);
 
     if (entityExists) {
       alert(`Entity "${tableName}" (${tableType}) already exists on canvas!`);
@@ -2102,8 +2100,7 @@ const DataProductPage = () => {
 
     const actualType = table?.type || tableType;
 
-    const finalFields =
-      fields && fields.length > 0 ? fields : table?.fields || [];
+    const finalFields = fields && fields.length > 0 ? fields : table?.fields || [];
     const newNode = {
       id: makeNodeId(),
       type: "tableNode",
@@ -2115,6 +2112,7 @@ const DataProductPage = () => {
         tableName: tableName,
         tableType: actualType,
         fields: finalFields,
+        joins: table?.joins || [],
         iscustom: table?.iscustom,
         selectedFields: [],
         attributeToggles: {},
@@ -2131,7 +2129,6 @@ const DataProductPage = () => {
     };
 
     setNodes((nds) => [...nds, newNode]);
-    console.log("In AddtableToCanvas, nodes finally:", nodes);
     return true;
   };
 
@@ -2191,8 +2188,8 @@ const DataProductPage = () => {
           : `${fileName}.json`;
       }
 
-      const entities = nodes;
-      const relationships = edges;
+      const entities = nodesRef.current;
+      const relationships = edgesRef;
       const cleanedTableMetadata = tableMetadata;
 
       const dataProduct = {
