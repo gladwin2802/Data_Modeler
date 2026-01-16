@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo, useRef } from "react";
+import { useState, useCallback, useEffect, memo, useRef, use } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   FiArrowLeft,
@@ -43,6 +43,7 @@ import ConnectionTypeDialog from "../components/DataProduct/ConnectionTypeDialog
 import ExportDialog from "../components/DataProduct/ExportDialog";
 import { useSuggestions } from "../hooks/useSuggestions";
 import { v4 as uuidv4 } from "uuid";
+import { TbPackageExport } from "react-icons/tb";
 
 const TableNode = memo(({ data, id }) => {
   const clickTimerRef = useRef(null);
@@ -423,6 +424,7 @@ const DataProductPage = () => {
   } = location.state || {};
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const nodesRef = useRef(nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [tableMetadata, setTableMetadata] = useState({});
   const [fileBaseTables, setFileBaseTables] = useState([]);
@@ -493,7 +495,6 @@ const DataProductPage = () => {
     setShowSuggestDialog,
   } = useSuggestions();
 
-  // Define handleShowReverseDeps early so it can be used in node data
   const handleShowReverseDeps = async (nodeId, tableName, tableType) => {
     try {
       const entityKey = `${tableType}_${tableName}`;
@@ -505,6 +506,7 @@ const DataProductPage = () => {
       });
 
       const entities = tableMetadata || {};
+      // console.log("tableMetadata entities:", entities);
       const selectedEntityData = entities[entityKey];
 
       if (!selectedEntityData || !selectedEntityData.fields) {
@@ -515,7 +517,7 @@ const DataProductPage = () => {
 
       const requiredEntities = new Map();
       const canvasEntityKeys = new Set(
-        nodes.map((n) => `${n.data.tableType}_${n.data.tableName}`)
+        nodesRef.current.map((n) => `${n.data.tableType}_${n.data.tableName}`)
       );
 
       const fieldsArray = Array.isArray(selectedEntityData.fields)
@@ -622,7 +624,8 @@ const DataProductPage = () => {
   };
 
   useEffect(() => {
-    console.log("Nodes updated:", nodes);
+    nodesRef.current = nodes;
+    console.log("Nodes updated:", nodesRef.current);
   }, [nodes]);
 
   useEffect(() => {
@@ -636,10 +639,6 @@ const DataProductPage = () => {
   useEffect(() => {
     console.log("customTables updated:", customTables);
   }, [customTables]);
-
-  useEffect(() => {
-    entityAttributeModesRef.current = entityAttributeModes;
-  }, [entityAttributeModes]);
 
   useEffect(() => {
     setNodes((currentNodes) =>
@@ -1439,61 +1438,20 @@ const DataProductPage = () => {
     setDeleteFieldInfo({ nodeId: null, fieldName: null });
   }, [deleteFieldInfo, setNodes, setEdges]);
 
-  const handleDeleteTable = useCallback(
-    (nodeId) => {
-      if (!window.confirm("Delete this table?")) return;
+  const handleDeleteTable = useCallback((nodeId) => {
+    if (!window.confirm("Delete this table?")) return;
 
-      const nodeToDelete = nodes.find((n) => n.id === nodeId);
+    // Use the ref for the latest nodes (avoids stale closure)
+    const currentNodes = nodesRef.current;
+    const nodeToDelete = currentNodes.find((n) => n.id === nodeId);
+    console.log("Deleting table:", nodeToDelete);
 
-      setEdges((eds) =>
-        eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
-      );
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) =>
+      eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+    );
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
 
-      if (nodeToDelete) {
-        const metadataKey = `${nodeToDelete.data.tableType}_${nodeToDelete.data.tableName}`;
-        setTableMetadata((prev) => {
-          const updated = { ...prev };
-          delete updated[metadataKey];
-          return updated;
-        });
-
-        setCustomTables((prev) => ({
-          ...prev,
-          [nodeToDelete.data.tableType]: prev[
-            nodeToDelete.data.tableType
-          ].filter((t) => t !== nodeToDelete.data.tableName),
-        }));
-      }
-
-      setTimeout(() => {
-        if (showReverseDepsDialog && selectedEntityForReverseDeps) {
-          handleShowReverseDeps(
-            selectedEntityForReverseDeps.nodeId,
-            selectedEntityForReverseDeps.tableName,
-            selectedEntityForReverseDeps.tableType
-          );
-        }
-        if (showSuggestDialog) {
-          generateSuggestions(
-            nodes.filter((n) => n.id !== nodeId),
-            sourceDataProduct
-          );
-        }
-      }, 100);
-    },
-    [
-      setNodes,
-      setEdges,
-      nodes,
-      showReverseDepsDialog,
-      selectedEntityForReverseDeps,
-      showSuggestDialog,
-      handleShowReverseDeps,
-      generateSuggestions,
-      sourceDataProduct,
-    ]
-  );
+  }, [setNodes, setEdges]); 
 
   const handleCreateByMode = useCallback(() => {
     if (!newEntityName.trim()) {
@@ -2129,9 +2087,12 @@ const DataProductPage = () => {
     customPosition = null,
     tableMetadata = {}
   ) => {
+    console.log("In AddtableToCanvas, nodes initially:", nodes);
     const entityExists = nodes.some(
       (n) => n.data.tableName === tableName && n.data.tableType === tableType
     );
+
+    console.log("In AddtableToCanvas, entityExists:", entityExists);
 
     if (entityExists) {
       alert(`Entity "${tableName}" (${tableType}) already exists on canvas!`);
@@ -2170,6 +2131,7 @@ const DataProductPage = () => {
     };
 
     setNodes((nds) => [...nds, newNode]);
+    console.log("In AddtableToCanvas, nodes finally:", nodes);
     return true;
   };
 
@@ -2270,7 +2232,7 @@ const DataProductPage = () => {
   };
 
   const handleSuggest = async () => {;
-    await generateSuggestions(nodes, tableMetadata);
+    await generateSuggestions(nodesRef.current, tableMetadata);
   };
 
   const handleAddSuggestedEntity = async (suggestion) => {
@@ -2741,6 +2703,26 @@ const DataProductPage = () => {
           <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
             {currentDataProductName || "New Data Product"}
           </h2>
+          
+          <button
+            onClick={onLayout}
+            style={{
+              padding: "8px 16px",
+              background: "#3b82f6",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "14px",
+              fontWeight: 600,
+            }}
+          >
+            <FiLayout size={16} />
+            Auto Layout
+          </button>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <button
@@ -2763,25 +2745,6 @@ const DataProductPage = () => {
             Suggest
           </button>
           <button
-            onClick={onLayout}
-            style={{
-              padding: "8px 16px",
-              background: "#3b82f6",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "14px",
-              fontWeight: 600,
-            }}
-          >
-            <FiLayout size={16} />
-            Auto Layout
-          </button>
-          <button
             onClick={handleExport}
             style={{
               padding: "8px 16px",
@@ -2797,7 +2760,7 @@ const DataProductPage = () => {
               fontWeight: 600,
             }}
           >
-            <FiDownload size={16} />
+            <TbPackageExport size={20} />
             Export
           </button>
           <button

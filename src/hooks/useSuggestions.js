@@ -43,7 +43,6 @@ export const useSuggestions = () => {
                 const dependencyMap = {}; // Map of dependent entities to their connection details
                 const dependencyTypes = {}; // Track the type of each dependency (BASE, CTE, VIEW)
                 
-                console.log("entityFields for", entityKey, ":", entityFields);
                 entityFields.forEach(fieldObj => {
                     const fieldName = fieldObj.name;
                     const fieldData = fieldObj;
