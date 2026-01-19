@@ -554,8 +554,10 @@ const DataProductPage = () => {
   const {
     showSuggestDialog,
     suggestions,
+    suggestionType,
     generateSuggestions,
     setShowSuggestDialog,
+    setSuggestionType,
   } = useSuggestions();
 
   const handleShowReverseDeps = async (nodeId, tableName, tableType) => {
@@ -685,7 +687,6 @@ const DataProductPage = () => {
       alert("Error finding downstream dependencies: " + error.message);
     }
   };
-
   const handleShowJoins = (nodeId, tableName, joins) => {
     setSelectedEntityForJoins(tableName);
     setJoinsData(joins || []);
@@ -3122,6 +3123,9 @@ const DataProductPage = () => {
           onAddSuggestion={handleAddSuggestedEntity}
           onClose={() => setShowSuggestDialog(false)}
           nodesCount={nodes.length}
+          suggestionType={suggestionType}
+          onSuggestionTypeChange={setSuggestionType}
+          onRegenerate={(type) => generateSuggestions(nodesRef.current, tableMetadata, type)}
         />
       )}
 

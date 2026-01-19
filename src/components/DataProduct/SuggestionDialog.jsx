@@ -5,7 +5,10 @@ const SuggestionDialog = ({
     suggestions, 
     onAddSuggestion, 
     onClose,
-    nodesCount 
+    nodesCount,
+    suggestionType = 'projected',
+    onSuggestionTypeChange = () => {},
+    onRegenerate = () => {}
 }) => {
     const [expandedSuggestions, setExpandedSuggestions] = useState(new Set());
 
@@ -338,10 +341,38 @@ const SuggestionDialog = ({
                         ×
                     </button>
                 </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px", padding: "12px", background: "#f3f4f6", borderRadius: "8px" }}>
+                    <label style={{ fontSize: "14px", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>
+                        Suggestion Mode:
+                    </label>
+                    <select
+                        value={suggestionType}
+                        onChange={(e) => {
+                            onSuggestionTypeChange(e.target.value);
+                            onRegenerate(e.target.value);
+                        }}
+                        style={{
+                            flex: 1,
+                            padding: "8px 12px",
+                            borderRadius: "6px",
+                            border: "1px solid #d1d5db",
+                            background: "white",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#374151",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <option value="projected">Based on Projected Entity</option>
+                        <option value="joins">Based on Joins</option>
+                    </select>
+                </div>
                 
                 <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "20px" }}>
                     Based on your canvas tables ({nodesCount} table{nodesCount !== 1 ? 's' : ''}), 
-                    here are {allSuggestions.length} derived entit{allSuggestions.length !== 1 ? 'ies' : 'y'} (CTEs/VIEWs) that can be created.
+                    here are {allSuggestions.length} derived entit{allSuggestions.length !== 1 ? 'ies' : 'y'} (CTEs/VIEWs) that can be created 
+                    {suggestionType === 'joins' ? ' based on join relationships' : ' based on projected entities'}.
                     Click any suggestion to add it to your canvas with all connections!
                 </p>
                 
