@@ -485,6 +485,7 @@ const DataProductPage = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const nodesRef = useRef(nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const edgesRef = useRef(edges);
   const [tableMetadata, setTableMetadata] = useState({});
   const [fileBaseTables, setFileBaseTables] = useState([]);
   const [fileViewTables, setFileViewTables] = useState([]);
@@ -676,7 +677,7 @@ const DataProductPage = () => {
         };
         foundReverseDeps.push(depObj);
       }
-
+      
       setReverseDeps(foundReverseDeps);
       setShowReverseDepsDialog(true);
     } catch (error) {
@@ -693,20 +694,21 @@ const DataProductPage = () => {
 
   useEffect(() => {
     nodesRef.current = nodes;
-    console.log("Nodes updated:", nodesRef.current);
+    // console.log("Nodes updated:", nodesRef.current);
   }, [nodes]);
 
   useEffect(() => {
-    console.log("Edges updated:", edges);
+    edgesRef.current = edges;
+    // console.log("Edges updated:", edgesRef.current);
   }, [edges]);
 
-  useEffect(() => {
-    console.log("table Metadata updated:", tableMetadata);
-  }, [tableMetadata]);
+  // useEffect(() => {
+  //   console.log("table Metadata updated:", tableMetadata);
+  // }, [tableMetadata]);
 
-  useEffect(() => {
-    console.log("customTables updated:", customTables);
-  }, [customTables]);
+  // useEffect(() => {
+  //   console.log("customTables updated:", customTables);
+  // }, [customTables]);
 
   useEffect(() => {
     setNodes((currentNodes) =>
@@ -1515,7 +1517,6 @@ const DataProductPage = () => {
     // Use the ref for the latest nodes (avoids stale closure)
     const currentNodes = nodesRef.current;
     const nodeToDelete = currentNodes.find((n) => n.id === nodeId);
-    console.log("Deleting table:", nodeToDelete);
 
     setEdges((eds) =>
       eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
@@ -2163,7 +2164,7 @@ const DataProductPage = () => {
     customPosition = null,
     tableMetadata = {}
   ) => {
-    const entityExists = nodes.some(
+    const entityExists = nodesRef.current.some(
       (n) => n.data.tableName === tableName && n.data.tableType === tableType
     );
 
@@ -2606,6 +2607,7 @@ const DataProductPage = () => {
           }));
 
       const newNodeId = makeNodeId();
+      const entityKey = `${checkEntityType}_${checkEntityName}`;
       const newNode = {
         id: newNodeId,
         type: "tableNode",
@@ -2617,7 +2619,8 @@ const DataProductPage = () => {
           tableName: checkEntityName,
           tableType: checkEntityType,
           fields: entityFields,
-          iscustom: false,
+          entityKey: entityKey,
+          iscustom: entity.iscustom || false,
           selectedFields: [],
           attributeToggles: {},
           globalAttributeMode: globalAttributeMode,
@@ -2630,7 +2633,7 @@ const DataProductPage = () => {
           onToggleFieldSelection: handleToggleFieldSelection,
           onOpenSettings: handleOpenSettings,
           onFieldClick: handleFieldClick,
-          joins: [],
+          joins: entity.joins || [],
         },
       };
 
@@ -3083,7 +3086,7 @@ const DataProductPage = () => {
                 onClick={() => {
                   setShowAddFieldDialog(false);
                   setNewFieldName("");
-                  setNewFieldType("VARCHAR");
+                  setNewFieldType("UNKNOWN");
                 }}
                 style={{
                   padding: "8px 16px",

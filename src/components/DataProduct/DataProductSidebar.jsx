@@ -549,19 +549,65 @@ const DataProductSidebar = ({
                     <div style={{
                         background: "white",
                         borderRadius: "8px",
-                        padding: "24px",
                         maxWidth: createMode === 'join' ? "600px" : "400px",
                         width: "90%",
                         maxHeight: "90vh",
-                        overflow: "auto",
-                        boxShadow: "0 20px 25px rgba(0, 0, 0, 0.15)"
+                        boxShadow: "0 20px 25px rgba(0, 0, 0, 0.15)",
+                        display: "flex",
+                        flexDirection: "column"
                     }}>
-                        <h2 style={{ margin: "0 0 16px 0", fontSize: "18px", fontWeight: 600, color: "#1f2937" }}>
-                            Create New Entity
-                        </h2>
+                        {/* Fixed Header */}
+                        <div style={{
+                            padding: "20px 24px",
+                            borderBottom: "1px solid #e5e7eb",
+                            flexShrink: 0,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                        }}>
+                            <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "#1f2937" }}>
+                                Create New Entity
+                            </h2>
+                            <button
+                                onClick={() => {
+                                    setShowCreateDialog(false);
+                                    setNewEntityName('');
+                                    setNewEntityType('BASE');
+                                    setCreateMode('simple');
+                                    setSelectedTables([]);
+                                    setSelectedFields([]);
+                                    setJoinConditions([]);
+                                    setProjectFieldsTableFilter('');
+                                    setCurrentJoinCondition({ from: { tableId: '', field: '' }, to: { tableId: '', field: '' }, type: 'INNER' });
+                                }}
+                                style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: "4px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#6b7280",
+                                    fontSize: "20px",
+                                    transition: "color 200ms ease"
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = "#1f2937"}
+                                onMouseLeave={(e) => e.currentTarget.style.color = "#6b7280"}
+                            >
+                                ✕
+                            </button>
+                        </div>
 
-                        {/* Mode Tabs */}
-                        <div style={{ display: "flex", gap: "8px", marginBottom: "20px", borderBottom: "1px solid #e5e7eb", paddingBottom: "12px" }}>
+                        {/* Fixed Tabs */}
+                        <div style={{ 
+                            display: "flex", 
+                            gap: "8px", 
+                            padding: "12px 24px",
+                            borderBottom: "1px solid #e5e7eb",
+                            flexShrink: 0,
+                            background: "white"
+                        }}>
                             <button
                                 onClick={() => {
                                     setCreateMode('simple');
@@ -602,6 +648,13 @@ const DataProductSidebar = ({
                                 Join Tables
                             </button>
                         </div>
+
+                        {/* Scrollable Content */}
+                        <div style={{
+                            flex: 1,
+                            overflow: "auto",
+                            padding: "24px"
+                        }}>
 
                         {createMode === 'simple' ? (
                             <>
@@ -1251,7 +1304,18 @@ const DataProductSidebar = ({
                             </>
                         )}
 
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        </div>
+
+                        {/* Fixed Footer */}
+                        <div style={{ 
+                            display: "flex", 
+                            gap: "8px", 
+                            justifyContent: "flex-end",
+                            padding: "16px 24px",
+                            borderTop: "1px solid #e5e7eb",
+                            background: "white",
+                            flexShrink: 0
+                        }}>
                             <button
                                 onClick={() => {
                                     setShowCreateDialog(false);

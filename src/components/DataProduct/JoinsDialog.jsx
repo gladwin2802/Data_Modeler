@@ -168,7 +168,7 @@ const JoinsDialog = ({
 
                                     {/* FROM Section */}
                                     <div style={{
-                                        marginBottom: "12px",
+                                        marginBottom: "0px",
                                     }}>
                                         <label style={{
                                             fontSize: "11px",
@@ -221,9 +221,9 @@ const JoinsDialog = ({
                                     {/* Arrow */}
                                     <div style={{
                                         textAlign: "center",
-                                        marginBottom: "12px",
-                                        fontSize: "16px",
-                                        color: "#d1d5db",
+                                        marginBottom: "0px",
+                                        fontSize: "25px",
+                                        color: "#a9e029",
                                     }}>
                                         ↓
                                     </div>
@@ -257,8 +257,8 @@ const JoinsDialog = ({
                                                 {toEntity}
                                             </div>
                                             <div style={{
-                                                fontSize: "16px",
-                                                color: "#d1d5db",
+                                                fontSize: "30px",
+                                                color: "#0c0c0c",
                                                 fontWeight: 300,
                                             }}>
                                                 .
