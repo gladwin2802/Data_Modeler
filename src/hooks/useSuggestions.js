@@ -6,8 +6,8 @@ export const useSuggestions = () => {
 
     const generateSuggestions = async (nodes, entitySource) => {
         try {
-            console.log("Current nodes:", nodes);
-            console.log("Source data product:", entitySource);  // tableMetadata
+            // console.log("Current nodes:", nodes);
+            // console.log("Source data product:", entitySource);  // tableMetadata
             const sourceEntities = entitySource || {};
 
             if (!entitySource || Object.keys(sourceEntities).length === 0) {
@@ -35,14 +35,14 @@ export const useSuggestions = () => {
                 if (!entityKey.startsWith('CTE_') && !entityKey.startsWith('VIEW_')) continue;
 
                 const entity = sourceEntities[entityKey];
-                const entityFields = Object.values(entity.fields || {});
+                const entityFields = Array.isArray(entity.fields) ? entity.fields : [];
                 if (entityFields.length === 0) continue;
 
                 const referencedEntities = new Set();
                 const missingReferencedEntities = new Set();
                 const dependencyMap = {}; // Map of dependent entities to their connection details
                 const dependencyTypes = {}; // Track the type of each dependency (BASE, CTE, VIEW)
-                
+
                 entityFields.forEach(fieldObj => {
                     const fieldName = fieldObj.name;
                     const fieldData = fieldObj;
@@ -97,7 +97,13 @@ export const useSuggestions = () => {
                     const missingEntitiesWithTypes = Array.from(missingReferencedEntities).map(fullKey => {
                         const type = fullKey.match(/^(BASE|CTE|VIEW)_/) ? fullKey.match(/^(BASE|CTE|VIEW)_/)[1] : 'BASE';
                         const name = fullKey.replace(/^(BASE_|CTE_|VIEW_)/, '');
-                        return { fullKey, name, type };
+                        const entityData = sourceEntities[fullKey] || {};
+                        return { 
+                            fullKey, 
+                            name, 
+                            type,
+                            ...entityData
+                        };
                     });
                     
                     foundSuggestions.push({
@@ -127,6 +133,7 @@ export const useSuggestions = () => {
             }
 
             uniqueSuggestions.sort((a, b) => b.coveragePercent - a.coveragePercent);
+            // console.log("Generated suggestions:", uniqueSuggestions);
             setSuggestions(uniqueSuggestions);
             setShowSuggestDialog(true);
         } catch (error) {

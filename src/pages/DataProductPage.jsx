@@ -36,6 +36,7 @@ import { getFile, saveDataProduct } from "../utils/ControlPage/fileStorage";
 import { getLayoutedElements, applyLayout } from "../utils/DataProduct/layout";
 import SuggestionDialog from "../components/DataProduct/SuggestionDialog";
 import ReverseDepsDialog from "../components/DataProduct/ReverseDepsDialog";
+import JoinsDialog from "../components/DataProduct/JoinsDialog";
 import DataProductSidebar from "../components/DataProduct/DataProductSidebar";
 import CalculationDialog from "../components/DataProduct/CalculationDialog";
 import SettingsDialog from "../components/DataProduct/SettingsDialog";
@@ -75,6 +76,7 @@ const TableNode = memo(({ data, id }) => {
         position: "relative",
       }}
     >
+      {/* LAYER 1: Name, Type, X, Settings */}
       <div
         style={{
           fontWeight: "bold",
@@ -96,30 +98,6 @@ const TableNode = memo(({ data, id }) => {
           </div>
         </div>
         <div style={{ display: "flex", gap: "4px" }}>
-          {(data.tableType === "CTE" || data.tableType === "VIEW") &&
-            !data.iscustom && (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    data.onShowReverseDeps(id, data.tableName, data.tableType);
-                  }}
-                  style={{
-                    background: "rgba(255, 255, 255, 0.2)",
-                    border: "1px solid rgba(255, 255, 255, 0.3)",
-                    borderRadius: "4px",
-                    color: "white",
-                    cursor: "pointer",
-                    padding: "4px 8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                  }}
-                  title="Show downstream dependency entities"
-                >
-                  ← Deps
-                </button>
-              </>
-            )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -144,25 +122,6 @@ const TableNode = memo(({ data, id }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              data.onAddField(id);
-            }}
-            style={{
-              background: "rgba(255, 255, 255, 0.2)",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              borderRadius: "4px",
-              color: "white",
-              cursor: "pointer",
-              padding: "4px 8px",
-              fontSize: "11px",
-              fontWeight: 600,
-            }}
-            title="Add Field"
-          >
-            + Field
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
               data.onDeleteTable(id);
             }}
             style={{
@@ -181,223 +140,323 @@ const TableNode = memo(({ data, id }) => {
           </button>
         </div>
       </div>
-      <div style={{ padding: "8px 0", minHeight: "50px" }}>
-        {data.fields.length === 0 ? (
-          <div
-            style={{
-              padding: "20px",
-              textAlign: "center",
-              color: "#9ca3af",
-              fontSize: "12px",
+
+      {/* LAYER 2: Deps and Joins */}
+      {(data.tableType === "CTE" || data.tableType === "VIEW") && !data.iscustom && (
+        <div style={{
+          padding: "8px 16px",
+          borderBottom: "1px solid #e5e7eb",
+          display: "flex",
+          gap: "8px",
+          background: "#f9fafb"
+        }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onShowReverseDeps(id, data.tableName, data.tableType);
             }}
+            style={{
+              background: "rgba(99, 102, 241, 0.1)",
+              border: "1px solid rgba(99, 102, 241, 0.3)",
+              borderRadius: "4px",
+              color: "#4f46e5",
+              cursor: "pointer",
+              padding: "6px 12px",
+              fontSize: "11px",
+              fontWeight: 600,
+              flex: 0.5,
+              textAlign: "center"
+            }}
+            title="Show downstream dependency entities"
           >
-            No fields yet. Click "+ Field" to add.
-          </div>
-        ) : (
-          data.fields.map((field, idx) => (
-            <div
-              key={idx}
+            ← Deps
+          </button>
+          {data.joins && data.joins.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (data.onShowJoins) {
+                  data.onShowJoins(id, data.tableName, data.joins);
+                }
+              }}
               style={{
-                position: "relative",
-                padding: "4px 8px",
+                background: "rgba(34, 197, 94, 0.1)",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                borderRadius: "4px",
+                color: "#16a34a",
+                cursor: "pointer",
+                padding: "6px 12px",
+                fontSize: "11px",
+                fontWeight: 600,
+                flex: 0.5,
+                textAlign: "center"
+              }}
+              title={`View ${data.joins.length} join${data.joins.length !== 1 ? 's' : ''}`}
+            >
+              🔗 Joins ({data.joins.length})
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* LAYER 3: Attributes/Fields */}
+      <div style={{
+        borderBottom: "1px solid #e5e7eb"
+      }}>
+        <div style={{
+          padding: "8px 16px",
+          background: "#f9fafb",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid #e5e7eb"
+        }}>
+          <div style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            color: "#6b7280"
+          }}>
+            Attributes
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onAddField(id);
+            }}
+            style={{
+              background: "rgba(99, 102, 241, 0.1)",
+              border: "1px solid rgba(99, 102, 241, 0.3)",
+              borderRadius: "4px",
+              color: "#4f46e5",
+              cursor: "pointer",
+              padding: "4px 8px",
+              fontSize: "11px",
+              fontWeight: 600,
+            }}
+            title="Add Field"
+          >
+            + Field
+          </button>
+        </div>
+
+        <div style={{ padding: "8px 0", minHeight: "50px" }}>
+          {data.fields.length === 0 ? (
+            <div
+              style={{
+                padding: "20px",
+                textAlign: "center",
+                color: "#9ca3af",
                 fontSize: "12px",
-                color: "#1f2937",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "0px",
-                background: "white",
-                borderLeft: field.isPK
-                  ? "3px solid #f59e0b"
-                  : "3px solid transparent",
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!field.isPK) {
-                  e.currentTarget.style.borderLeftColor = colors.border;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!field.isPK) {
-                  e.currentTarget.style.borderLeftColor = "transparent";
-                }
               }}
             >
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={`${field.name}-target`}
-                style={{
-                  left: -8,
-                  width: 12,
-                  height: 12,
-                  background: "#3b82f6",
-                  border: "2px solid white",
-                }}
-              />
+              No fields yet. Click "+ Field" to add.
+            </div>
+          ) : (
+            data.fields.map((field, idx) => (
               <div
+                key={idx}
                 style={{
+                  position: "relative",
+                  padding: "4px 8px",
+                  fontSize: "12px",
+                  color: "#1f2937",
                   display: "flex",
+                  justifyContent: "space-between",
                   alignItems: "center",
-                  gap: "6px",
-                  flex: 1,
-                  background:
-                    field.calculation !== null ? "#a8caebff" : "white",
-                  borderRadius: "10px",
-                  padding: "8px",
+                  gap: "0px",
+                  background: "white",
+                  borderLeft: field.isPK
+                    ? "3px solid #f59e0b"
+                    : "3px solid transparent",
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!field.isPK) {
+                    e.currentTarget.style.borderLeftColor = colors.border;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!field.isPK) {
+                    e.currentTarget.style.borderLeftColor = "transparent";
+                  }
                 }}
               >
-                <label
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={`${field.name}-target`}
                   style={{
-                    position: "relative",
-                    display: "inline-block",
-                    width: "28px",
-                    height: "16px",
-                    flexShrink: 0,
-                    cursor: "pointer",
+                    left: -8,
+                    width: 12,
+                    height: 12,
+                    background: "#3b82f6",
+                    border: "2px solid white",
                   }}
-                  title={(() => {
-                    const toggleKey = `${id}_${field.name}`;
-                    const isToggled =
-                      data.attributeToggles?.[toggleKey] || false;
-                    const effectiveMode = isToggled
-                      ? data.globalAttributeMode === "runtime"
-                        ? "loadtime"
-                        : "runtime"
-                      : data.globalAttributeMode;
-                    return effectiveMode;
-                  })()}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    flex: 1,
+                    background:
+                      field.calculation !== null ? "#a8caebff" : "white",
+                    borderRadius: "10px",
+                    padding: "8px",
+                  }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={(() => {
-                      const toggleKey = `${id}_${field.name}`;
-                      return data.attributeToggles?.[toggleKey] || false;
-                    })()}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      if (data.onToggleFieldSelection) {
-                        data.onToggleFieldSelection(id, field.name);
-                      }
-                    }}
-                    style={{ display: "none" }}
-                  />
-                  <span
+                  <label
                     style={{
-                      position: "absolute",
+                      position: "relative",
+                      display: "inline-block",
+                      width: "28px",
+                      height: "16px",
+                      flexShrink: 0,
                       cursor: "pointer",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: (() => {
-                        const toggleKey = `${id}_${field.name}`;
-                        const isToggled =
-                          data.attributeToggles?.[toggleKey] || false;
-                        return isToggled ? "#6366f1" : "#cbd5e1";
-                      })(),
-                      transition: "0.3s",
-                      borderRadius: "16px",
                     }}
+                    title={(() => {
+                      const toggleKey = `${id}_${field.name}`;
+                      const isToggled =
+                        data.attributeToggles?.[toggleKey] || false;
+                      const effectiveMode = isToggled
+                        ? data.globalAttributeMode === "runtime"
+                          ? "loadtime"
+                          : "runtime"
+                        : data.globalAttributeMode;
+                      return effectiveMode;
+                    })()}
                   >
+                    <input
+                      type="checkbox"
+                      checked={(() => {
+                        const toggleKey = `${id}_${field.name}`;
+                        return data.attributeToggles?.[toggleKey] || false;
+                      })()}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        if (data.onToggleFieldSelection) {
+                          data.onToggleFieldSelection(id, field.name);
+                        }
+                      }}
+                      style={{ display: "none" }}
+                    />
                     <span
                       style={{
                         position: "absolute",
-                        content: "",
-                        height: "12px",
-                        width: "12px",
-                        left: (() => {
+                        cursor: "pointer",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: (() => {
                           const toggleKey = `${id}_${field.name}`;
                           const isToggled =
                             data.attributeToggles?.[toggleKey] || false;
-                          return isToggled ? "14px" : "2px";
+                          return isToggled ? "#6366f1" : "#cbd5e1";
                         })(),
-                        bottom: "2px",
-                        backgroundColor: "white",
                         transition: "0.3s",
-                        borderRadius: "50%",
+                        borderRadius: "16px",
                       }}
-                    ></span>
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          content: "",
+                          height: "12px",
+                          width: "12px",
+                          left: (() => {
+                            const toggleKey = `${id}_${field.name}`;
+                            const isToggled =
+                              data.attributeToggles?.[toggleKey] || false;
+                            return isToggled ? "14px" : "2px";
+                          })(),
+                          bottom: "2px",
+                          backgroundColor: "white",
+                          transition: "0.3s",
+                          borderRadius: "50%",
+                        }}
+                      ></span>
+                    </span>
+                  </label>
+                  <span
+                    style={{
+                      fontWeight: field.isPK ? 600 : 500,
+                      flex: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                      display: "flex",
+                      gap: "6px",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const now = Date.now();
+                      const isDoubleClick = now - lastClickRef.current < 300;
+
+                      if (clickTimerRef.current) {
+                        clearTimeout(clickTimerRef.current);
+                      }
+
+                      if (isDoubleClick) {
+                        if (data.onTogglePK) {
+                          data.onTogglePK(id, field.name);
+                        }
+                        lastClickRef.current = 0;
+                      } else {
+                        lastClickRef.current = now;
+                        clickTimerRef.current = setTimeout(() => {
+                          if (data.onFieldClick) {
+                            data.onFieldClick(field.name, field, id);
+                          }
+                        }, 300);
+                      }
+                    }}
+                    title="Click to edit calculation, double-click to set as primary key"
+                  >
+                    <span>{field.name}</span>
+                    {field.isPK && (
+                      <FiKey
+                        size={14}
+                        style={{ color: "#f59e0b", flexShrink: 0 }}
+                        title="Primary Key"
+                      />
+                    )}
                   </span>
-                </label>
-                <span
-                  style={{
-                    fontWeight: field.isPK ? 600 : 500,
-                    flex: 1,
-                    cursor: "pointer",
-                    userSelect: "none",
-                    display: "flex",
-                    gap: "6px",
-                  }}
+                </div>
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    const now = Date.now();
-                    const isDoubleClick = now - lastClickRef.current < 300;
-
-                    if (clickTimerRef.current) {
-                      clearTimeout(clickTimerRef.current);
-                    }
-
-                    if (isDoubleClick) {
-                      if (data.onTogglePK) {
-                        data.onTogglePK(id, field.name);
-                      }
-                      lastClickRef.current = 0;
-                    } else {
-                      lastClickRef.current = now;
-                      clickTimerRef.current = setTimeout(() => {
-                        if (data.onFieldClick) {
-                          data.onFieldClick(field.name, field, id);
-                        }
-                      }, 300);
-                    }
+                    data.onRemoveField(id, field.name);
                   }}
-                  title="Click to edit calculation, double-click to set as primary key"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#ef4444",
+                    cursor: "pointer",
+                    padding: "2px 6px",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    borderRadius: "4px",
+                  }}
+                  title="Remove Field"
                 >
-                  <span>{field.name}</span>
-                  {field.isPK && (
-                    <FiKey
-                      size={14}
-                      style={{ color: "#f59e0b", flexShrink: 0 }}
-                      title="Primary Key"
-                    />
-                  )}
-                </span>
+                  ✕
+                </button>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={`${field.name}-source`}
+                  style={{
+                    right: -8,
+                    width: 12,
+                    height: 12,
+                    background: "#10b981",
+                    border: "2px solid white",
+                  }}
+                />
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  data.onRemoveField(id, field.name);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  padding: "2px 6px",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  borderRadius: "4px",
-                }}
-                title="Remove Field"
-              >
-                ✕
-              </button>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={`${field.name}-source`}
-                style={{
-                  right: -8,
-                  width: 12,
-                  height: 12,
-                  background: "#10b981",
-                  border: "2px solid white",
-                }}
-              />
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -463,6 +522,9 @@ const DataProductPage = () => {
   const [reverseDeps, setReverseDeps] = useState([]);
   const [selectedEntityForReverseDeps, setSelectedEntityForReverseDeps] =
     useState(null);
+  const [showJoinsDialog, setShowJoinsDialog] = useState(false);
+  const [joinsData, setJoinsData] = useState([]);
+  const [selectedEntityForJoins, setSelectedEntityForJoins] = useState(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportJson, setExportJson] = useState("");
   const [selectedFields, setSelectedFields] = useState({});
@@ -621,6 +683,12 @@ const DataProductPage = () => {
       console.error("Error finding downstream dependencies:", error);
       alert("Error finding downstream dependencies: " + error.message);
     }
+  };
+
+  const handleShowJoins = (nodeId, tableName, joins) => {
+    setSelectedEntityForJoins(tableName);
+    setJoinsData(joins || []);
+    setShowJoinsDialog(true);
   };
 
   useEffect(() => {
@@ -895,10 +963,12 @@ const DataProductPage = () => {
             onDeleteTable: handleDeleteTable,
             onTogglePK: handleTogglePK,
             onShowReverseDeps: handleShowReverseDeps,
+            onShowJoins: handleShowJoins,
             onToggleFieldSelection: handleToggleFieldSelection,
             onOpenSettings: handleOpenSettings,
             onFieldClick: handleFieldClick,
             selectedFields: canvasNode.data.selectedFields || [],
+            joins: canvasNode.data.joins || [],
           },
         });
       });
@@ -1544,8 +1614,10 @@ const DataProductPage = () => {
               ...node.data,
               onShowReverseDeps: (nodeId, tableName, tableType) =>
                 handleShowReverseDeps(nodeId, tableName, tableType),
+              onShowJoins: handleShowJoins,
               onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
               onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
+              joins: node.data.joins || [],
             },
           };
         }
@@ -1803,8 +1875,10 @@ const DataProductPage = () => {
               ...node.data,
               onShowReverseDeps: (nodeId, tableName, tableType) =>
                 handleShowReverseDeps(nodeId, tableName, tableType),
+              onShowJoins: handleShowJoins,
               onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
               onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
+              joins: node.data.joins || [],
             },
           };
         }
@@ -2060,6 +2134,7 @@ const DataProductPage = () => {
             if (field.calculation !== null) fieldObj.calculation = field.calculation;
             return fieldObj;
           }),
+          joins: node.data.joins || [],
       };
     });
 
@@ -2112,7 +2187,6 @@ const DataProductPage = () => {
         tableName: tableName,
         tableType: actualType,
         fields: finalFields,
-        joins: table?.joins || [],
         iscustom: table?.iscustom,
         selectedFields: [],
         attributeToggles: {},
@@ -2122,9 +2196,11 @@ const DataProductPage = () => {
         onDeleteTable: handleDeleteTable,
         onTogglePK: handleTogglePK,
         onShowReverseDeps: handleShowReverseDeps,
+        onShowJoins: handleShowJoins,
         onFieldClick: handleFieldClick,
         onToggleFieldSelection: handleToggleFieldSelection,
         onOpenSettings: handleOpenSettings,
+        joins: table?.joins || [],
       },
     };
 
@@ -2234,6 +2310,7 @@ const DataProductPage = () => {
 
   const handleAddSuggestedEntity = async (suggestion) => {
     try {
+      // console.log("Adding suggested entity to canvas:", suggestion);
       const checkEntityName = suggestion.entityName.replace(
         /^(BASE_|CTE_|VIEW_)/,
         ""
@@ -2254,8 +2331,8 @@ const DataProductPage = () => {
         );
         return;
       }
-
-      const sourceEntities = sourceDataProduct?.entities || {};
+      
+      const sourceEntities = tableMetadata || {};
       // Construct the full entity key with prefix
       const fullEntityKey = `${checkEntityType}_${checkEntityName}`;
       const entity =
@@ -2275,71 +2352,63 @@ const DataProductPage = () => {
         suggestion.missingEntities.length > 0
       ) {
         for (const missingEntity of suggestion.missingEntities) {
-          // Construct the full entity key for missing entities
-          const missingEntityFullKey = `${missingEntity.type}_${missingEntity.name}`;
-          const missingEntityData = sourceEntities[missingEntityFullKey];
-          if (missingEntityData) {
-            const missingFields = Array.isArray(missingEntityData.fields)
-              ? missingEntityData.fields.map((f) => ({
-                  name: f.name,
-                  type: f.type || "unknown",
-                  ref: f.ref || null,
-                  calculation: f.calculation || null,
-                  isPK: f.isPK || false,
-                }))
-              : Object.keys(missingEntityData.fields || {}).map(
-                  (fieldName) => ({
-                    name: fieldName,
-                    type: missingEntityData.fields[fieldName].type || "unknown",
-                    ref: missingEntityData.fields[fieldName].ref || null,
-                    calculation:
-                      missingEntityData.fields[fieldName].calculation || null,
-                    isPK: missingEntityData.fields[fieldName].isPK || false,
-                  })
-                );
+          // console.log("Adding missing entity to canvas:", missingEntity);
+          // missingEntity already contains full entity data from tableMetadata
+          const missingEntityFullKey = missingEntity.fullKey || `${missingEntity.type}_${missingEntity.name}`;
+          
+          const missingFields = Array.isArray(missingEntity.fields)
+            ? missingEntity.fields.map((f) => ({
+                name: f.name,
+                type: f.type || "unknown",
+                ref: f.ref || null,
+                calculation: f.calculation || null,
+                isPK: f.isPK || false,
+              }))
+            : [];
 
-            const missingNodeId = makeNodeId();
-            const missingNode = {
-              id: missingNodeId,
-              type: "tableNode",
-              position: {
-                x: Math.random() * 300 + 100,
-                y: Math.random() * 300 + 100,
-              },
-              data: {
-                tableName: missingEntity.name,
-                tableType: missingEntity.type,
-                fields: missingFields,
-                entityKey: missingEntityFullKey,
-                iscustom: false,
-                selectedFields: [],
-                attributeToggles: {},
-                globalAttributeMode: globalAttributeMode,
-                onAddField: handleAddField,
-                onRemoveField: handleRemoveField,
-                onDeleteTable: handleDeleteTable,
-                onTogglePK: handleTogglePK,
-                onShowReverseDeps: handleShowReverseDeps,
-                onToggleFieldSelection: handleToggleFieldSelection,
-                onOpenSettings: handleOpenSettings,
-                onFieldClick: handleFieldClick,
-              },
-            };
+          const missingNodeId = makeNodeId();
+          const missingNode = {
+            id: missingNodeId,
+            type: "tableNode",
+            position: {
+              x: Math.random() * 300 + 100,
+              y: Math.random() * 300 + 100,
+            },
+            data: {
+              tableName: missingEntity.name,
+              tableType: missingEntity.type,
+              fields: missingFields,
+              entityKey: missingEntityFullKey,
+              iscustom: missingEntity.iscustom || false,
+              selectedFields: [],
+              attributeToggles: {},
+              globalAttributeMode: globalAttributeMode,
+              onAddField: handleAddField,
+              onRemoveField: handleRemoveField,
+              onDeleteTable: handleDeleteTable,
+              onTogglePK: handleTogglePK,
+              onShowReverseDeps: handleShowReverseDeps,
+              onShowJoins: handleShowJoins,
+              onToggleFieldSelection: handleToggleFieldSelection,
+              onOpenSettings: handleOpenSettings,
+              onFieldClick: handleFieldClick,
+              joins: missingEntity.joins || [],
+            },
+          };
 
-            addedNodes.push(missingNode);
+          addedNodes.push(missingNode);
 
-            if (missingEntity.type === "BASE") {
-              if (!fileBaseTables.includes(missingEntity.name)) {
-                setFileBaseTables((prev) => [...prev, missingEntity.name]);
-              }
-            } else if (missingEntity.type === "VIEW") {
-              if (!fileViewTables.includes(missingEntity.name)) {
-                setFileViewTables((prev) => [...prev, missingEntity.name]);
-              }
-            } else if (missingEntity.type === "CTE") {
-              if (!fileCteTables.includes(missingEntity.name)) {
-                setFileCteTables((prev) => [...prev, missingEntity.name]);
-              }
+          if (missingEntity.type === "BASE") {
+            if (!fileBaseTables.includes(missingEntity.name)) {
+              setFileBaseTables((prev) => [...prev, missingEntity.name]);
+            }
+          } else if (missingEntity.type === "VIEW") {
+            if (!fileViewTables.includes(missingEntity.name)) {
+              setFileViewTables((prev) => [...prev, missingEntity.name]);
+            }
+          } else if (missingEntity.type === "CTE") {
+            if (!fileCteTables.includes(missingEntity.name)) {
+              setFileCteTables((prev) => [...prev, missingEntity.name]);
             }
           }
         }
@@ -2388,7 +2457,7 @@ const DataProductPage = () => {
           tableType: checkEntityType,
           fields: entityFields,
           entityKey: fullEntityKey,
-          iscustom: false,
+          iscustom: entity.iscustom || false,
           selectedFields: [],
           attributeToggles: {},
           globalAttributeMode: globalAttributeMode,
@@ -2397,9 +2466,11 @@ const DataProductPage = () => {
           onDeleteTable: handleDeleteTable,
           onTogglePK: handleTogglePK,
           onShowReverseDeps: handleShowReverseDeps,
+          onShowJoins: handleShowJoins,
           onToggleFieldSelection: handleToggleFieldSelection,
           onOpenSettings: handleOpenSettings,
           onFieldClick: handleFieldClick,
+          joins: entity.joins || [],
         },
       };
 
@@ -2555,9 +2626,11 @@ const DataProductPage = () => {
           onDeleteTable: handleDeleteTable,
           onTogglePK: handleTogglePK,
           onShowReverseDeps: handleShowReverseDeps,
+          onShowJoins: handleShowJoins,
           onToggleFieldSelection: handleToggleFieldSelection,
           onOpenSettings: handleOpenSettings,
           onFieldClick: handleFieldClick,
+          joins: [],
         },
       };
 
@@ -3055,6 +3128,14 @@ const DataProductPage = () => {
           selectedEntity={selectedEntityForReverseDeps}
           onAddEntity={handleAddReverseDep}
           onClose={() => setShowReverseDepsDialog(false)}
+        />
+      )}
+
+      {showJoinsDialog && selectedEntityForJoins && (
+        <JoinsDialog
+          joins={joinsData}
+          tableName={selectedEntityForJoins}
+          onClose={() => setShowJoinsDialog(false)}
         />
       )}
 
