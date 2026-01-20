@@ -66,7 +66,7 @@ All your work is saved locally on your computer. You choose a folder, and the ap
 
 2. Open a terminal/command prompt and navigate to the project directory:
 ```bash
-cd SQL_Data_Model
+cd Data_Modeler
 ```
 
 3. Install dependencies:
