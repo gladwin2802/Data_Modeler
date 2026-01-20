@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiSearch, FiPlus, FiCheckCircle } from "react-icons/fi";
+import { FiSearch, FiPlus, FiCheckCircle, FiX } from "react-icons/fi";
 import CreateEntityByJoinDialog from './CreateEntityByJoinDialog';
 
 const DataProductSidebar = ({
@@ -16,7 +16,8 @@ const DataProductSidebar = ({
     onAddTable,
     tableMetadata,
     canvasEntities = [],
-    onCreateNewEntity
+    onCreateNewEntity,
+    onRemoveCustomEntity
 }) => {
     const [showCreateDialog, setShowCreateDialog] = React.useState(false);
     const [newEntityName, setNewEntityName] = React.useState('');
@@ -182,25 +183,15 @@ const DataProductSidebar = ({
                                     {filterTables([...new Set([...fileBaseTables, ...customTables.BASE])]).map((table) => {
                                         const fieldCount = tableMetadata[`BASE_${table}`]?.fields?.length || 0;
                                         const onCanvas = isOnCanvas(table, 'BASE');
+                                        const isCustom = customTables.BASE.includes(table);
                                         return (
-                                            <button
+                                            <div
                                                 key={`BASE_${table}`}
-                                                onClick={() => onAddTable(table, 'BASE',[],null, tableMetadata)}
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'BASE' }));
-                                                    e.dataTransfer.effectAllowed = 'move';
-                                                    e.currentTarget.style.cursor = 'grabbing';
-                                                }}
-                                                onDragEnd={(e) => {
-                                                    e.currentTarget.style.cursor = 'grab';
-                                                }}
                                                 style={{
                                                     padding: "10px 12px",
                                                     background: onCanvas ? "#f3f4f6" : "white",
                                                     border: onCanvas ? "1px solid #9ca3af" : "1px solid #e5e7eb",
                                                     borderRadius: "6px",
-                                                    textAlign: "left",
                                                     cursor: onCanvas ? "not-allowed" : "grab",
                                                     fontSize: "13px",
                                                     fontWeight: 500,
@@ -210,6 +201,7 @@ const DataProductSidebar = ({
                                                     justifyContent: "space-between",
                                                     alignItems: "center",
                                                     opacity: onCanvas ? 0.6 : 1,
+                                                    position: "relative"
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if (!onCanvas) {
@@ -224,23 +216,76 @@ const DataProductSidebar = ({
                                                     }
                                                 }}
                                             >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <button
+                                                    onClick={() => onAddTable(table, 'BASE',[],null, tableMetadata)}
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'BASE' }));
+                                                        e.dataTransfer.effectAllowed = 'move';
+                                                        e.currentTarget.style.cursor = 'grabbing';
+                                                    }}
+                                                    onDragEnd={(e) => {
+                                                        e.currentTarget.style.cursor = 'grab';
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        textAlign: "left",
+                                                        background: "transparent",
+                                                        border: "none",
+                                                        cursor: onCanvas ? "not-allowed" : "grab",
+                                                        fontSize: "13px",
+                                                        fontWeight: 500,
+                                                        color: "inherit",
+                                                        padding: 0,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "8px",
+                                                    }}
+                                                >
                                                     <span>{table}</span>
                                                     {onCanvas && (
                                                         <FiCheckCircle size={14} style={{ color: "#10b981" }} title="On Canvas" />
                                                     )}
+                                                </button>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <span style={{
+                                                        fontSize: "11px",
+                                                        background: onCanvas ? "#e5e7eb" : "#eff6ff",
+                                                        color: onCanvas ? "#6b7280" : "#3b82f6",
+                                                        padding: "2px 8px",
+                                                        borderRadius: "12px",
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
+                                                    </span>
+                                                    {isCustom && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm(`Remove custom entity "${table}"?`)) {
+                                                                    onRemoveCustomEntity(table, 'BASE');
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer",
+                                                                color: "#ef4444",
+                                                                fontSize: "16px",
+                                                                padding: "0",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                transition: "color 200ms ease"
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.color = "#dc2626"}
+                                                            onMouseLeave={(e) => e.currentTarget.style.color = "#ef4444"}
+                                                            title="Remove custom entity"
+                                                        >
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <span style={{
-                                                    fontSize: "11px",
-                                                    background: onCanvas ? "#e5e7eb" : "#eff6ff",
-                                                    color: onCanvas ? "#6b7280" : "#3b82f6",
-                                                    padding: "2px 8px",
-                                                    borderRadius: "12px",
-                                                    fontWeight: 600
-                                                }}>
-                                                    {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
-                                                </span>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                     {filterTables(fileBaseTables).length === 0 && (
@@ -256,25 +301,15 @@ const DataProductSidebar = ({
                                     {filterTables([...new Set([...fileCteTables, ...customTables.CTE])]).map((table) => {
                                         const fieldCount = tableMetadata[`CTE_${table}`]?.fields?.length || 0;
                                         const onCanvas = isOnCanvas(table, 'CTE');
+                                        const isCustom = customTables.CTE.includes(table);
                                         return (
-                                            <button
+                                            <div
                                                 key={`CTE_${table}`}
-                                                onClick={() => onAddTable(table, 'CTE',[],null, tableMetadata)}
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'CTE' }));
-                                                    e.dataTransfer.effectAllowed = 'move';
-                                                    e.currentTarget.style.cursor = 'grabbing';
-                                                }}
-                                                onDragEnd={(e) => {
-                                                    e.currentTarget.style.cursor = 'grab';
-                                                }}
                                                 style={{
                                                     padding: "10px 12px",
                                                     background: onCanvas ? "#f3f4f6" : "white",
                                                     border: onCanvas ? "1px solid #9ca3af" : "1px solid #e5e7eb",
                                                     borderRadius: "6px",
-                                                    textAlign: "left",
                                                     cursor: onCanvas ? "not-allowed" : "grab",
                                                     fontSize: "13px",
                                                     fontWeight: 500,
@@ -284,6 +319,7 @@ const DataProductSidebar = ({
                                                     justifyContent: "space-between",
                                                     alignItems: "center",
                                                     opacity: onCanvas ? 0.6 : 1,
+                                                    position: "relative"
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if (!onCanvas) {
@@ -298,23 +334,76 @@ const DataProductSidebar = ({
                                                     }
                                                 }}
                                             >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <button
+                                                    onClick={() => onAddTable(table, 'CTE',[],null, tableMetadata)}
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'CTE' }));
+                                                        e.dataTransfer.effectAllowed = 'move';
+                                                        e.currentTarget.style.cursor = 'grabbing';
+                                                    }}
+                                                    onDragEnd={(e) => {
+                                                        e.currentTarget.style.cursor = 'grab';
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        textAlign: "left",
+                                                        background: "transparent",
+                                                        border: "none",
+                                                        cursor: onCanvas ? "not-allowed" : "grab",
+                                                        fontSize: "13px",
+                                                        fontWeight: 500,
+                                                        color: "inherit",
+                                                        padding: 0,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "8px",
+                                                    }}
+                                                >
                                                     <span>{table}</span>
                                                     {onCanvas && (
                                                         <FiCheckCircle size={14} style={{ color: "#10b981" }} title="On Canvas" />
                                                     )}
+                                                </button>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <span style={{
+                                                        fontSize: "11px",
+                                                        background: onCanvas ? "#e5e7eb" : "#f3e8ff",
+                                                        color: onCanvas ? "#6b7280" : "#8b5cf6",
+                                                        padding: "2px 8px",
+                                                        borderRadius: "12px",
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
+                                                    </span>
+                                                    {isCustom && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm(`Remove custom entity "${table}"?`)) {
+                                                                    onRemoveCustomEntity(table, 'CTE');
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer",
+                                                                color: "#ef4444",
+                                                                fontSize: "16px",
+                                                                padding: "0",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                transition: "color 200ms ease"
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.color = "#dc2626"}
+                                                            onMouseLeave={(e) => e.currentTarget.style.color = "#ef4444"}
+                                                            title="Remove custom entity"
+                                                        >
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <span style={{
-                                                    fontSize: "11px",
-                                                    background: onCanvas ? "#e5e7eb" : "#f3e8ff",
-                                                    color: onCanvas ? "#6b7280" : "#8b5cf6",
-                                                    padding: "2px 8px",
-                                                    borderRadius: "12px",
-                                                    fontWeight: 600
-                                                }}>
-                                                    {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
-                                                </span>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                     {filterTables([...fileCteTables, ...customTables.CTE]).length === 0 && (
@@ -330,25 +419,15 @@ const DataProductSidebar = ({
                                     {filterTables([...new Set([...fileViewTables, ...customTables.VIEW])]).map((table) => {
                                         const fieldCount = tableMetadata[`VIEW_${table}`]?.fields?.length || 0;
                                         const onCanvas = isOnCanvas(table, 'VIEW');
+                                        const isCustom = customTables.VIEW.includes(table);
                                         return (
-                                            <button
+                                            <div
                                                 key={`VIEW_${table}`}
-                                                onClick={() => onAddTable(table, 'VIEW',[],null, tableMetadata)}
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'VIEW' }));
-                                                    e.dataTransfer.effectAllowed = 'move';
-                                                    e.currentTarget.style.cursor = 'grabbing';
-                                                }}
-                                                onDragEnd={(e) => {
-                                                    e.currentTarget.style.cursor = 'grab';
-                                                }}
                                                 style={{
                                                     padding: "10px 12px",
                                                     background: onCanvas ? "#f3f4f6" : "white",
                                                     border: onCanvas ? "1px solid #9ca3af" : "1px solid #e5e7eb",
                                                     borderRadius: "6px",
-                                                    textAlign: "left",
                                                     cursor: onCanvas ? "not-allowed" : "grab",
                                                     fontSize: "13px",
                                                     fontWeight: 500,
@@ -358,6 +437,7 @@ const DataProductSidebar = ({
                                                     justifyContent: "space-between",
                                                     alignItems: "center",
                                                     opacity: onCanvas ? 0.6 : 1,
+                                                    position: "relative"
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if (!onCanvas) {
@@ -372,23 +452,76 @@ const DataProductSidebar = ({
                                                     }
                                                 }}
                                             >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <button
+                                                    onClick={() => onAddTable(table, 'VIEW',[],null, tableMetadata)}
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.setData('application/reactflow', JSON.stringify({ tableName: table, tableType: 'VIEW' }));
+                                                        e.dataTransfer.effectAllowed = 'move';
+                                                        e.currentTarget.style.cursor = 'grabbing';
+                                                    }}
+                                                    onDragEnd={(e) => {
+                                                        e.currentTarget.style.cursor = 'grab';
+                                                    }}
+                                                    style={{
+                                                        flex: 1,
+                                                        textAlign: "left",
+                                                        background: "transparent",
+                                                        border: "none",
+                                                        cursor: onCanvas ? "not-allowed" : "grab",
+                                                        fontSize: "13px",
+                                                        fontWeight: 500,
+                                                        color: "inherit",
+                                                        padding: 0,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "8px",
+                                                    }}
+                                                >
                                                     <span>{table}</span>
                                                     {onCanvas && (
                                                         <FiCheckCircle size={14} style={{ color: "#10b981" }} title="On Canvas" />
                                                     )}
+                                                </button>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <span style={{
+                                                        fontSize: "11px",
+                                                        background: onCanvas ? "#e5e7eb" : "#d1fae5",
+                                                        color: onCanvas ? "#6b7280" : "#10b981",
+                                                        padding: "2px 8px",
+                                                        borderRadius: "12px",
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
+                                                    </span>
+                                                    {isCustom && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm(`Remove custom entity "${table}"?`)) {
+                                                                    onRemoveCustomEntity(table, 'VIEW');
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                background: "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer",
+                                                                color: "#ef4444",
+                                                                fontSize: "16px",
+                                                                padding: "0",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                transition: "color 200ms ease"
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.color = "#dc2626"}
+                                                            onMouseLeave={(e) => e.currentTarget.style.color = "#ef4444"}
+                                                            title="Remove custom entity"
+                                                        >
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <span style={{
-                                                    fontSize: "11px",
-                                                    background: onCanvas ? "#e5e7eb" : "#d1fae5",
-                                                    color: onCanvas ? "#6b7280" : "#10b981",
-                                                    padding: "2px 8px",
-                                                    borderRadius: "12px",
-                                                    fontWeight: 600
-                                                }}>
-                                                    {fieldCount} {fieldCount === 1 ? 'field' : 'fields'}
-                                                </span>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                     {filterTables(fileViewTables).length === 0 && (
@@ -461,7 +594,7 @@ const DataProductSidebar = ({
                         </div>
 
                         {/* Fixed Tabs */}
-                        {/* <div style={{ 
+                        <div style={{ 
                             display: "flex", 
                             gap: "8px", 
                             padding: "12px 24px",
@@ -505,7 +638,7 @@ const DataProductSidebar = ({
                             >
                                 Join Tables
                             </button>
-                        </div> */}
+                        </div>
 
                         {/* Scrollable Content */}
                         <div style={{

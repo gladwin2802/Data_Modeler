@@ -142,7 +142,7 @@ const TableNode = memo(({ data, id }) => {
       </div>
 
       {/* LAYER 2: Deps and Joins */}
-      {(data.tableType === "CTE" || data.tableType === "VIEW") && !data.iscustom && (
+      {(data.tableType === "CTE" || data.tableType === "VIEW") && (!data.iscustom || data.derived) && (
         <div style={{
           padding: "8px 16px",
           borderBottom: "1px solid #e5e7eb",
@@ -695,7 +695,7 @@ const DataProductPage = () => {
 
   useEffect(() => {
     nodesRef.current = nodes;
-    // console.log("Nodes updated:", nodesRef.current);
+    console.log("Nodes updated:", nodesRef.current);
   }, [nodes]);
 
   useEffect(() => {
@@ -703,9 +703,9 @@ const DataProductPage = () => {
     // console.log("Edges updated:", edgesRef.current);
   }, [edges]);
 
-  // useEffect(() => {
-  //   console.log("table Metadata updated:", tableMetadata);
-  // }, [tableMetadata]);
+  useEffect(() => {
+    console.log("table Metadata updated:", tableMetadata);
+  }, [tableMetadata]);
 
   // useEffect(() => {
   //   console.log("customTables updated:", customTables);
@@ -1526,6 +1526,45 @@ const DataProductPage = () => {
 
   }, [setNodes, setEdges]); 
 
+  const handleRemoveCustomEntity = useCallback((tableName, tableType) => {
+    setCustomTables((prev) => ({
+      ...prev,
+      [tableType]: prev[tableType].filter((t) => t !== tableName),
+    }));
+    
+    const metadataKey = `${tableType}_${tableName}`;
+    setTableMetadata((prev) => {
+      const updated = { ...prev };
+      delete updated[metadataKey];
+      return updated;
+    });
+  }, [setCustomTables]);
+
+  const addCustomEntityToMetadata = useCallback((tableName, tableType, fields, joins = [], isderived = false) => {
+    const metadataKey = `${tableType}_${tableName}`;
+    setTableMetadata((prev) => ({
+      ...prev,
+      [metadataKey]: {
+        name: tableName,
+        type: tableType,
+        fields: fields.map((f) => ({
+          name: f.name,
+          type: f.type || "VARCHAR",
+          ref: f.ref || null,
+          calculation: f.calculation || null,
+        })),
+        iscustom: true,
+        joins: joins || [],
+        derived: isderived,
+      },
+    }));
+
+    setCustomTables((prev) => ({
+      ...prev,
+      [tableType]: [...prev[tableType], tableName],
+    }));
+  }, [setTableMetadata, setCustomTables]);
+
   const handleCreateByMode = useCallback(() => {
     if (!newEntityName.trim()) {
       alert("Please enter an entity name");
@@ -1594,6 +1633,7 @@ const DataProductPage = () => {
         tableType: newEntityType,
         fields: fieldsToUse,
         iscustom: true,
+        derived: true,
         selectedFields: [],
         attributeToggles: {},
         globalAttributeMode: globalAttributeMode,
@@ -1619,7 +1659,7 @@ const DataProductPage = () => {
               onShowJoins: handleShowJoins,
               onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
               onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
-              joins: node.data.joins || [],
+              joins: sourceNode?.data?.joins || [],
             },
           };
         }
@@ -1760,15 +1800,14 @@ const DataProductPage = () => {
       if (!fileBaseTables.includes(newEntityName)) {
         setFileBaseTables((prev) => [...prev, newEntityName]);
       }
+      addCustomEntityToMetadata(newEntityName, "BASE", fieldsToUse, sourceNode?.data?.joins, true);
     } else if (newEntityType === "VIEW") {
       if (!fileViewTables.includes(newEntityName)) {
         setFileViewTables((prev) => [...prev, newEntityName]);
       }
+      addCustomEntityToMetadata(newEntityName, "VIEW", fieldsToUse, sourceNode?.data?.joins, true);
     } else if (newEntityType === "CTE") {
-      setCustomTables((prev) => ({
-        ...prev,
-        CTE: [...prev.CTE, newEntityName],
-      }));
+      addCustomEntityToMetadata(newEntityName, "CTE", fieldsToUse, sourceNode?.data?.joins, true);
     }
 
     setShowSettingsDialog(false);
@@ -1796,6 +1835,7 @@ const DataProductPage = () => {
     handleDeleteTable,
     handleOpenSettings,
     handleFieldClick,
+    addCustomEntityToMetadata,
   ]);
 
   const handleCreateFromSelected = useCallback(() => {
@@ -1855,6 +1895,7 @@ const DataProductPage = () => {
         tableType: newEntityType,
         fields: fieldsToUse,
         iscustom: true,
+        derived: true,
         selectedFields: [],
         attributeToggles: {},
         globalAttributeMode: globalAttributeMode,
@@ -1880,7 +1921,7 @@ const DataProductPage = () => {
               onShowJoins: handleShowJoins,
               onDeleteTable: (nodeId) => handleDeleteTable(nodeId),
               onOpenSettings: (nodeId) => handleOpenSettings(nodeId),
-              joins: node.data.joins || [],
+              joins: sourceNode?.data?.joins || [],
             },
           };
         }
@@ -1998,15 +2039,14 @@ const DataProductPage = () => {
       if (!fileBaseTables.includes(newEntityName)) {
         setFileBaseTables((prev) => [...prev, newEntityName]);
       }
+      addCustomEntityToMetadata(newEntityName, "BASE", fieldsToUse, sourceNode?.data?.joins, true);
     } else if (newEntityType === "VIEW") {
       if (!fileViewTables.includes(newEntityName)) {
         setFileViewTables((prev) => [...prev, newEntityName]);
       }
+      addCustomEntityToMetadata(newEntityName, "VIEW", fieldsToUse, sourceNode?.data?.joins, true);
     } else if (newEntityType === "CTE") {
-      setCustomTables((prev) => ({
-        ...prev,
-        CTE: [...prev.CTE, newEntityName],
-      }));
+      addCustomEntityToMetadata(newEntityName, "CTE", fieldsToUse, sourceNode?.data?.joins,true);
     }
 
     setShowSettingsDialog(false);
@@ -2034,6 +2074,7 @@ const DataProductPage = () => {
     handleDeleteTable,
     handleOpenSettings,
     handleFieldClick,
+    addCustomEntityToMetadata,
   ]);
 
   const onEdgeClick = useCallback(
@@ -2190,6 +2231,7 @@ const DataProductPage = () => {
         tableType: actualType,
         fields: finalFields,
         iscustom: table?.iscustom,
+        derived: table?.derived,
         selectedFields: [],
         attributeToggles: {},
         globalAttributeMode: globalAttributeMode,
@@ -2219,25 +2261,11 @@ const DataProductPage = () => {
       return;
     }
 
-    const metadataKey = `${tableType}_${tableName}`;
-    setTableMetadata((prev) => ({
-      ...prev,
-      [metadataKey]: {
-        name: tableName,
-        type: tableType,
-        fields: [],
-        iscustom: true,
-      },
-    }));
-
-    setCustomTables((prev) => ({
-      ...prev,
-      [tableType]: [...prev[tableType], tableName],
-    }));
+    addCustomEntityToMetadata(tableName, tableType, []);
 
     const meta_updated = {
       ...tableMetadata,
-      [metadataKey]: {
+      [`${tableType}_${tableName}`]: {
         name: tableName,
         type: tableType,
         fields: [],
@@ -2878,6 +2906,7 @@ const DataProductPage = () => {
             tableType: n.data.tableType,
           }))}
           onCreateNewEntity={handleCreateNewTable}
+          onRemoveCustomEntity={handleRemoveCustomEntity}
         />
 
         <div style={{ flex: 1, position: "relative" }}>
