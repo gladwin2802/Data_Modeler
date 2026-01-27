@@ -1,0 +1,208 @@
+{
+  "entities": {
+    "BASE_SalesStatus_Items": {
+      "alias": "SO",
+      "fields": {
+        "Client_MANDT": {},
+        "InvoiceUoM_MEINS": {},
+        "InvoiceCurrency_WAERS": {},
+        "MaterialNumber_MATNR": {},
+        "MaterialText_MAKTX": {},
+        "DeliveredUoM_MEINS": {},
+        "ProductHierarchy_PRODH": {},
+        "Language_SPRAS": {},
+        "InvoiceQty_RFMNG": {},
+        "InvoiceValue_RFWRT": {},
+        "DeliveredQty_RFMNG": {},
+        "Currency_WAERK": {},
+        "SalesUnit_VRKME": {}
+      }
+    },
+    "BASE_SalesOrders": {
+      "alias": "vbap",
+      "fields": {
+        "SalesUnit_VRKME": {},
+        "Currency_WAERK": {},
+        "Client_MANDT": {},
+        "MaterialNumber_MATNR": {},
+        "SalesOrganization_VKORG": {},
+        "CumulativeOrderQuantity_KWMENG": {},
+        "NetPrice_NETWR": {}
+      }
+    },
+    "CTE_SO": {
+      "fields": {
+        "Client_MANDT": {
+          "ref": [
+            "BASE_SalesStatus_Items.Client_MANDT"
+          ]
+        },
+        "InvoiceUoM_MEINS": {
+          "ref": [
+            "BASE_SalesStatus_Items.InvoiceUoM_MEINS"
+          ]
+        },
+        "InvoiceCurrency_WAERS": {
+          "ref": [
+            "BASE_SalesStatus_Items.InvoiceCurrency_WAERS"
+          ]
+        },
+        "MaterialNumber_MATNR": {
+          "ref": [
+            "BASE_SalesStatus_Items.MaterialNumber_MATNR"
+          ]
+        },
+        "MaterialText_MAKTX": {
+          "ref": [
+            "BASE_SalesStatus_Items.MaterialText_MAKTX"
+          ]
+        },
+        "DeliveredUoM_MEINS": {
+          "ref": [
+            "BASE_SalesStatus_Items.DeliveredUoM_MEINS"
+          ]
+        },
+        "ProductHierarchy_PRODH": {
+          "ref": [
+            "BASE_SalesStatus_Items.ProductHierarchy_PRODH"
+          ]
+        },
+        "Language_SPRAS": {
+          "ref": [
+            "BASE_SalesStatus_Items.Language_SPRAS"
+          ]
+        },
+        "BilledQty": {
+          "ref": [
+            "BASE_SalesStatus_Items.InvoiceQty_RFMNG"
+          ],
+          "calculation": {
+            "expression": "SUM(SO.InvoiceQty_RFMNG)",
+            "ref": [
+              "BASE_SalesStatus_Items.InvoiceQty_RFMNG"
+            ]
+          }
+        },
+        "InvoicePrice": {
+          "ref": [
+            "BASE_SalesStatus_Items.InvoiceValue_RFWRT"
+          ],
+          "calculation": {
+            "expression": "SUM(SO.InvoiceValue_RFWRT)",
+            "ref": [
+              "BASE_SalesStatus_Items.InvoiceValue_RFWRT"
+            ]
+          }
+        },
+        "DeliveredQty": {
+          "ref": [
+            "BASE_SalesStatus_Items.DeliveredQty_RFMNG"
+          ],
+          "calculation": {
+            "expression": "SUM(SO.DeliveredQty_RFMNG)",
+            "ref": [
+              "BASE_SalesStatus_Items.DeliveredQty_RFMNG"
+            ]
+          }
+        },
+        "DeliveredPendingBilling": {
+          "ref": [
+            "BASE_SalesStatus_Items.DeliveredQty_RFMNG",
+            "BASE_SalesStatus_Items.InvoiceQty_RFMNG"
+          ],
+          "calculation": {
+            "expression": "(SUM(SO.DeliveredQty_RFMNG) - SUM(SO.InvoiceQty_RFMNG))",
+            "ref": [
+              "BASE_SalesStatus_Items.DeliveredQty_RFMNG",
+              "BASE_SalesStatus_Items.InvoiceQty_RFMNG"
+            ]
+          }
+        }
+      }
+    },
+    "VIEW_Final": {
+      "fields": {
+        "Client_MANDT": {
+          "ref": [
+            "CTE_SO.Client_MANDT"
+          ]
+        },
+        "MaterialNumber_MATNR": {
+          "ref": [
+            "CTE_SO.MaterialNumber_MATNR"
+          ]
+        },
+        "MaterialText_MAKTX": {
+          "ref": [
+            "CTE_SO.MaterialText_MAKTX"
+          ]
+        },
+        "SalesUnit_VRKME": {
+          "ref": [
+            "BASE_SalesOrders.SalesUnit_VRKME"
+          ]
+        },
+        "Currency_WAERK": {
+          "ref": [
+            "BASE_SalesOrders.Currency_WAERK"
+          ]
+        },
+        "DeliveredQty": {
+          "ref": [
+            "CTE_SO.DeliveredQty"
+          ]
+        },
+        "DeliveredUoM_MEINS": {
+          "ref": [
+            "CTE_SO.DeliveredUoM_MEINS"
+          ]
+        },
+        "DeliveredPendingBilling": {
+          "ref": [
+            "CTE_SO.DeliveredPendingBilling"
+          ]
+        },
+        "SalesOrganization_VKORG": {
+          "ref": [
+            "BASE_SalesOrders.SalesOrganization_VKORG"
+          ]
+        },
+        "SalesQty": {
+          "ref": [
+            "BASE_SalesOrders.CumulativeOrderQuantity_KWMENG"
+          ],
+          "calculation": {
+            "expression": "SUM(vbap.CumulativeOrderQuantity_KWMENG)",
+            "ref": [
+              "BASE_SalesOrders.CumulativeOrderQuantity_KWMENG"
+            ]
+          }
+        },
+        "NetPrice": {
+          "ref": [
+            "BASE_SalesOrders.NetPrice_NETWR"
+          ],
+          "calculation": {
+            "expression": "SUM(vbap.NetPrice_NETWR)",
+            "ref": [
+              "BASE_SalesOrders.NetPrice_NETWR"
+            ]
+          }
+        },
+        "PendingDelivery": {
+          "ref": [
+            "BASE_SalesOrders.CumulativeOrderQuantity_KWMENG",
+            "CTE_SO.DeliveredQty"
+          ],
+          "calculation": {
+            "expression": "(SUM(vbap.CumulativeOrderQuantity_KWMENG) - SO.DeliveredQty)",
+            "ref": [
+              "BASE_SalesOrders.CumulativeOrderQuantity_KWMENG",
+              "CTE_SO.DeliveredQty"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

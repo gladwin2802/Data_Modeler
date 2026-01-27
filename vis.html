@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Graph Editor</title>
+  <script src="https://unpkg.com/vis-network@latest/dist/vis-network.min.js"></script>
+  <style>
+    #cy, #subgraph-cy {
+      width: 90%;
+      height: 95vh;
+      border: 1px solid #ccc;
+      margin: 20px auto;
+      position: relative;
+      user-select: none;
+    }
+    #controls, #subgraph-controls {
+      margin: 10px auto;
+      width: 100%;
+      text-align: center;
+    }
+    #controls button, #subgraph-controls button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    hr.double-line {
+      border: none;
+      border-top: 3px double #333;
+      margin: 20px auto;
+      width: 90%;
+    }
+    h1 {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Interactive Graph Editor</h1>
+  <div id="controls">
+    <button id="fileimport">Import</button>
+    <button id="addNodeBtn">Add Node</button>
+    <button id="addEdgeBtn">Add Edge</button>
+    <button id="addConnectedNodeBtn" disabled>Add Connected Node (+)</button>
+    <button id="renameBtn" disabled>Change Label</button>
+    <button id="modifySizeBtn" disabled>Modify Size</button>
+    <button id="deleteBtn" disabled>Delete</button>
+    <button id="clearAllBtn">Clear All</button>
+    <button id="downloadJsonBtn">Export(JSON)</button>
+    <button id="showSubgraphBtn" disabled>SubGraph</button>
+  </div>
+  <div id="cy"></div>
+  <script>
+    const cyContainer = document.getElementById('cy');
+    const addNodeBtn = document.getElementById('addNodeBtn');
+    const addEdgeBtn = document.getElementById('addEdgeBtn');
+    const addConnectedNodeBtn = document.getElementById('addConnectedNodeBtn');
+    const renameBtn = document.getElementById('renameBtn');
+    const modifySizeBtn = document.getElementById('modifySizeBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const showSubgraphBtn = document.getElementById('showSubgraphBtn');
+    const fileImportBtn = document.getElementById('fileimport');
+
+    let subgraphContainer = null;
+    let subgraphNetwork = null;
+    let clearSubgraphBtn = null;
+    let doubleLine = null;
+    let subgraphTitle = null;
+
+    const baseEdgeLength = 150;
+
+    const defaultNodeColor = '#b3c6ff';
+    const nodehighlightColor = '#4d79ff';
+    const NodefontColor = '#ff3333';
+    const nodeshape = "dot"; // "dot", "box", "ellipse", "circle", "database"
+
+    const defaultEdgeColor = '#80e5ff';
+    const edgeHighlightColor = '#00b8e6';
+    const edgeFontColor = '#990000';
+    
+    let nodes = new vis.DataSet([
+      { id: 'a', label: 'Node A', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' },
+      { id: 'b', label: 'Node B', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' },
+      { id: 'c', label: 'Node C', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' },
+      { id: 'd', label: 'Node D', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' },
+      { id: 'e', label: 'Node E', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' },
+      { id: 'f', label: 'Node F', size: 40, color: defaultNodeColor, font: { color: NodefontColor, size: 16 }, shape: 'dot' }
+    ]);
+    let edges = new vis.DataSet([
+      { id: 'ab', label: 'Edge AB', from: 'a', to: 'b', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+      { id: 'bc', label: 'Edge BC', from: 'b', to: 'c', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+      { id: 'cd', label: 'Edge CD', from: 'c', to: 'd', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+      { id: 'ae', label: 'Edge AE', from: 'a', to: 'e', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+      { id: 'ef', label: 'Edge EF', from: 'e', to: 'f', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+      { id: 'bf', label: 'Edge BF', from: 'b', to: 'f', width: 3, color: { color: defaultEdgeColor }, font: { size: 12 , color: edgeFontColor }, arrows: { to: { enabled: true } } },
+    ]);
+
+    const data = { nodes, edges };
+
+    const options = {
+      physics:{
+        enabled: false,
+        barnesHut: {
+      theta: 0.2,
+      gravitationalConstant: -30000,
+      centralGravity: 0.2,
+      springLength: baseEdgeLength,
+      springConstant: 0.3,
+      damping: 0.1,
+      avoidOverlap: 0
+    },
+        forceAtlas2Based: {
+      theta: 0.2,
+      gravitationalConstant: -50,
+      centralGravity: 0.01,
+      springConstant: 0.1,
+      springLength: 150,
+      damping: 0.3,
+      avoidOverlap: 0
+    },
+        repulsion: {
+      centralGravity: 0.1,
+      springLength: 200,
+      springConstant: 0.2,
+      nodeDistance: 100,
+      damping: 0.4
+    },
+        hierarchicalRepulsion: {
+      centralGravity: 0.1,
+      springLength: 100,
+      springConstant: 0.01,
+      nodeDistance: 120,
+      damping: 0.09,
+      avoidOverlap: 0
+    },
+        maxVelocity: 50,
+        minVelocity: 0,
+        solver: 'barnesHut',
+        stabilization: {
+      enabled: true,
+      iterations: 10000,
+      updateInterval: 100,
+      onlyDynamicEdges: false,
+      fit: true
+    },
+        // timestep: 0.5,
+        adaptiveTimestep: true,
+        wind: { x: 0, y: 0 }
+  },
+      nodes: {
+        // color: { border: '#3333ff', background: defaultNodeColor, highlight: { border: '#0000ff', background: nodehighlightColor }, hover: { border: '#0000ff', background: nodehighlightColor } },
+        shape: nodeshape,
+        shapeProperties: { borderRadius: 6 },
+        shadow:{
+      enabled: true,
+      color: 'rgba(0,0,0,0.3)',
+      size:5,
+      x:-5,
+      y:5
+    },
+        // shape: 'dot',
+        font: { face: 'arial', align: 'center', vadjust: -60 }
+      },
+      edges: 
+      {
+        color: { color: defaultEdgeColor, highlight: edgeHighlightColor, hover: edgeHighlightColor, inherit: 'from' },
+        length: baseEdgeLength,
+        endPointOffset: {
+          // from: 0,
+          to: -12
+        },
+        shadow:{
+          enabled: true,
+          color: 'rgba(0,0,0,0.3)',
+          size:7,
+          x:-5,
+          y:5
+        },
+        arrows: { 
+          to: { enabled: true, scaleFactor:0.5 } 
+        },
+        smooth: { 
+          enabled: true,
+          type: "dynamic"
+          // roundness: 0.5
+        },   
+        // type: 'curvedCW'
+        font: { align: 'middle' },
+        hoverWidth : 3    
+      },
+      interaction: { dragNodes: true, 
+        selectable: true , 
+        hover: true ,
+        tooltipDelay: 10
+        },
+      layout: {
+        randomSeed: undefined,
+        improvedLayout:true,
+        // clusterThreshold: 150,
+    hierarchical: {
+      enabled:false,
+      levelSeparation: 150,
+      nodeSpacing: 200,
+      treeSpacing: 200,
+      blockShifting: true,
+      edgeMinimization: true,
+      parentCentralization: true,
+      direction: 'UD',        // UD, DU, LR, RL
+      sortMethod: 'hubsize',  // hubsize, directed
+      shakeTowards: 'leaves'  // roots, leaves
+    }}
+    };
+
+    let network = new vis.Network(cyContainer, data, options);
+
+    let selectedId = null;
+    let selectedType = null;
+    let edgeSourceId = null;
+    let addingEdge = false;
+
+    const resetHighlights = () => {
+      nodes.forEach(node => {
+        nodes.update({ id: node.id, color: defaultNodeColor, font: { color: NodefontColor, size: 16 } });
+      });
+      // edges.forEach(edge => {
+      //   edges.update({ id: edge.id, color: { color: defaultEdgeColor }, font: { color: edgeFontColor, size: 12 } });
+      // });
+    };
+
+    const highlightSelected = (id, type) => {
+      resetHighlights();
+      if (type === 'node') {
+        nodes.update({ id, color: nodehighlightColor, font: { color: NodefontColor, size: 16 } });
+        const outgoingEdges = edges.get().filter(e => e.from === id);
+        outgoingEdges.forEach(e => {
+          // edges.update({ id: e.id, color: { color: edgeHighlightColor } , font: { color: edgeFontColor, size: 12 } });
+          nodes.update({ id: e.to, color: nodehighlightColor, font: { color: NodefontColor, size: 16 } });
+        });
+      } 
+      // else if (type === 'edge') {
+      //   edges.update({ id, color: { color: edgeHighlightColor } });
+      // }
+    };
+
+    network.on('click', (params) => {
+      if (addingEdge) {
+        if (params.nodes.length > 0) {
+          const targetId = params.nodes[0];
+          if (edgeSourceId === targetId) {
+            alert('Cannot create edge to the same node.');
+            addingEdge = false;
+            edgeSourceId = null;
+            return;
+          }
+          if (edges.get().some(e => e.from === edgeSourceId && e.to === targetId)) {
+            alert('A directed edge already exists between these nodes.');
+            addingEdge = false;
+            edgeSourceId = null;
+            return;
+          }
+          const edgeId = 'edge_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          let label = prompt('Enter edge label:', `Edge ${nodes.get(edgeSourceId).label} to ${nodes.get(targetId).label}`);
+          if (!label) return alert('Edge label is required.');
+          let sizeStr = prompt('Enter edge width (1-10):', '3');
+          let size = Math.min(10, Math.max(1, parseInt(sizeStr) || 3));
+          edges.add({
+            id: edgeId,
+            label: label,
+            from: edgeSourceId,
+            to: targetId,
+            length: baseEdgeLength + label.length * 3,
+            width: size,
+            color: { color: defaultEdgeColor },
+            font: { size: 12, color: edgeFontColor },
+            arrows: { to: { enabled: true } }
+          });
+          console.log(baseEdgeLength + label.length * 3);
+          nodes.update({ id: edgeSourceId, physics: true });
+          nodes.update({ id: targetId, physics: true });
+          addingEdge = false;
+          edgeSourceId = null;
+        }
+        return;
+      }
+
+      if (params.nodes.length > 0) {
+        selectedId = params.nodes[0];
+        selectedType = 'node';
+        highlightSelected(selectedId, selectedType);
+        addConnectedNodeBtn.disabled = false;
+        renameBtn.disabled = false;
+        modifySizeBtn.disabled = false;
+        deleteBtn.disabled = false;
+        showSubgraphBtn.disabled = false;
+      } else if (params.edges.length > 0) {
+        selectedId = params.edges[0];
+        selectedType = 'edge';
+        highlightSelected(selectedId, selectedType);
+        addConnectedNodeBtn.disabled = true;
+        renameBtn.disabled = false;
+        modifySizeBtn.disabled = false;
+        deleteBtn.disabled = false;
+        showSubgraphBtn.disabled = true;
+      } else {
+        selectedId = null;
+        selectedType = null;
+        resetHighlights();
+        addConnectedNodeBtn.disabled = true;
+        renameBtn.disabled = true;
+        modifySizeBtn.disabled = true;
+        deleteBtn.disabled = true;
+        showSubgraphBtn.disabled = true;
+      }
+    });
+
+    // File Import
+    fileImportBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,.csv';
+      input.onchange = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const fileContent = e.target.result;
+            if (file.name.endsWith('.json')) {
+              const parsedData = JSON.parse(fileContent);
+              let importNodes = [];
+              let importEdges = [];
+              if (parsedData.elements) {
+                importNodes = (parsedData.elements.nodes || []).map(node => ({
+                  id: node.data.id,
+                  label: node.data.label || node.data.id,
+                  size: parseInt(node.data.size) || 40,
+                  color: defaultNodeColor,
+                  font: { color: '#000', size: 16 },
+                  shape: 'dot',
+                  x: node.position ? node.position.x : Math.random() * 400,
+                  y: node.position ? node.position.y : Math.random() * 400
+                }));
+                importEdges = (parsedData.elements.edges || []).map(edge => ({
+                  id: edge.data.id,
+                  label: edge.data.label || `Edge ${edge.data.source} to ${edge.data.target}`,
+                  from: edge.data.source,
+                  to: edge.data.target,
+                  length: 150 + (edge.data.label ? edge.data.label.length * 3 : 0),
+                  width: parseInt(edge.data.size) || 3,
+                  color: { color: defaultEdgeColor },
+                  font: { size: 12, strokeWidth: 2, strokeColor: '#fff' },
+                  arrows: { to: { enabled: true } }
+                }));
+              } else if (parsedData.nodes && parsedData.edges) {
+                importNodes = (parsedData.nodes || []).map(node => ({
+                  id: node.data.id,
+                  label: node.data.label,
+                  size: parseInt(node.data.size) || 40,
+                  color: defaultNodeColor,
+                  font: { color: NodefontColor, size: 16 },
+                  shape: nodeshape,
+                  x: node.position ? node.position.x : Math.random() * 400,
+                  y: node.position ? node.position.y : Math.random() * 400
+                }));
+                importEdges = (parsedData.edges || []).map(edge => ({
+                  id: edge.data.id,
+                  label: edge.data.label || `Edge ${edge.data.source} to ${edge.data.target}`,
+                  from: edge.data.source,
+                  to: edge.data.target,
+                  width: parseInt(edge.data.size) || 3,
+                  color: { color: defaultEdgeColor },
+                  font: { size: 12, color: edgeFontColor },
+                  arrows: { to: { enabled: true } }
+                }));
+              } else {
+                alert('Invalid JSON format. Expected format with "elements" or "nodes" and "edges".');
+                return;
+              }
+              nodes.clear();
+              edges.clear();
+              nodes.add(importNodes);
+              edges.add(importEdges);
+            } else if (file.name.endsWith('.csv')) {
+              const lines = fileContent.split('\n').map(line => line.trim()).filter(line => line);
+              const importNodes = [];
+              const importEdges = [];
+              const nodeMap = new Map();
+              lines.forEach((line, index) => {
+                if (index === 0) return;
+                const [source, target, edgeLabel, nodeSize, edgeWidth] = line.split(',').map(item => item.trim());
+                if (!source || !target) {
+                  alert(`Invalid CSV format at line ${index + 1}. Expected: source,target,edgeLabel,nodeSize,edgeWidth`);
+                  return;
+                }
+                if (!nodeMap.has(source)) {
+                  nodeMap.set(source, {
+                    id: source,
+                    label: source,
+                    size: parseInt(nodeSize) || 40,
+                    color: defaultNodeColor,
+                    font: { color: NodefontColor, size: 16 },
+                    shape: nodeshape,
+                    x: Math.random() * 800 - 400,
+                    y: Math.random() * 800 - 400
+                  });
+                }
+                if (!nodeMap.has(target)) {
+                  nodeMap.set(target, {
+                    id: target,
+                    label: target,
+                    size: parseInt(nodeSize) || 40,
+                    color: defaultNodeColor,
+                    font: { color: NodefontColor, size: 16 },
+                    shape: nodeshape,
+                    x: Math.random() * 800 - 400,
+                    y: Math.random() * 800 - 400
+                  });
+                }
+                const edgeId = `edge_${source}_${target}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                importEdges.push({
+                  id: edgeId,
+                  label: edgeLabel || `Edge ${source} to ${target}`,
+                  from: source,
+                  to: target,
+                  length: baseEdgeLength + edgeLabel.length * 3,
+                  width: parseInt(edgeWidth) || 3,
+                  color: { color: defaultEdgeColor },
+                  font: { size: 12, color: edgeFontColor },
+                  arrows: { to: { enabled: true } }
+                });
+                // console.log(source, target, edgeLabel.length * 3 ,baseEdgeLength + edgeLabel.length * 3);
+              });
+              importNodes.push(...nodeMap.values());
+              nodes.clear();
+              edges.clear();
+              nodes.add(importNodes);
+              edges.add(importEdges);
+              network.setOptions({ physics: true });
+              network.once('stabilizationIterationsDone', () => {
+                network.setOptions({ physics: false });
+              });
+            } else {
+              alert('Unsupported file type. Please upload a .json or .csv file.');
+            }
+          } catch (error) {
+            alert('Error processing file: ' + error.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+
+    // Add Node
+    addNodeBtn.addEventListener('click', () => {
+      let name = prompt('Enter node label:');
+      if (!name) return alert('Node label is required.');
+      const id = 'node_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      let sizeStr = prompt('Enter node size (10-100):', '40');
+      let size = Math.min(100, Math.max(10, parseInt(sizeStr) || 40));
+      nodes.add({
+        id: id,
+        physics: false,
+        title : name,
+        label: name,
+        size: size,
+        color: defaultNodeColor,
+        font: { color: NodefontColor, size: 16 },
+        shape: nodeshape,
+        x: Math.random() * 800 - 400,
+        y: Math.random() * 800 - 400
+      });
+    });
+
+    // Add Edge
+    addEdgeBtn.addEventListener('click', () => {
+      if (!selectedId || selectedType !== 'node') {
+        alert('Select a source node by clicking it first.');
+        return;
+      }
+      edgeSourceId = selectedId;
+      alert(`Selected source node : "${nodes.get(edgeSourceId).label}".\nNow click a target node to create a directed edge.`);
+      addingEdge = true;
+    });
+
+    // Add Connected Node (+)
+    addConnectedNodeBtn.addEventListener('click', () => {
+      if (!selectedId || selectedType !== 'node') return alert('Select a node first.');
+      let name = prompt('Enter new node label:');
+      if (!name) return alert('Node label is required.');
+      let sizeStr = prompt('Enter node size (10-100):', '40');
+      let size = Math.min(100, Math.max(10, parseInt(sizeStr) || 40));
+      const sourcePos = network.getPosition(selectedId);
+      const newNodeId = 'node_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      nodes.add({
+        id: newNodeId,
+        label: name,
+        size: size,
+        color: defaultNodeColor,
+        font: { color: NodefontColor, size: 16 },
+        shape: nodeshape,
+        x: sourcePos.x + 100,
+        y: sourcePos.y
+      });
+      const edgeId = 'edge_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      let edgeLabel = prompt('Enter edge label:', `Edge ${nodes.get(selectedId).label} to ${name}`);
+      if (!edgeLabel) return alert('Edge label is required.');
+      let edgeSizeStr = prompt('Enter edge width (1-10):', '3');
+      let edgeSize = Math.min(10, Math.max(1, parseInt(edgeSizeStr) || 3));
+      edges.add({
+        id: edgeId,
+        label: edgeLabel,
+        from: selectedId,
+        to: newNodeId,
+        length: 150 + edgeLabel.length*3,
+        width: edgeSize,
+        color: { color: defaultEdgeColor },
+        font: { size: 12,color: edgeFontColor },
+        arrows: { to: { enabled: true } }
+      });
+    });
+
+    // Change Label
+    renameBtn.addEventListener('click', () => {
+      if (!selectedId) return alert('Select a node or edge first.');
+      let newLabel = prompt(`Enter new label for ${selectedType} "${selectedType === 'node' ? nodes.get(selectedId).label : edges.get(selectedId).label}":`);
+      if (!newLabel) return alert('Label is required.');
+      if (selectedType === 'node') {
+        nodes.update({ id: selectedId, label: newLabel });
+      } else {
+        edges.update({ id: selectedId, label: newLabel , length: baseEdgeLength + newLabel.length * 3});
+      }
+    });
+
+    // Modify Size
+    modifySizeBtn.addEventListener('click', () => {
+      if (!selectedId) return alert('Select a node or edge first.');
+      const isNode = selectedType === 'node';
+      const currentSize = isNode ? nodes.get(selectedId).size : edges.get(selectedId).width;
+      let sizeStr = prompt(`Enter new size for ${isNode ? 'node' : 'edge'} "${isNode ? nodes.get(selectedId).label : edges.get(selectedId).label}" (${isNode ? '10-100' : '1-10'}):`, currentSize);
+      if (!sizeStr) return;
+      let newSize = isNode ? Math.min(100, Math.max(10, parseInt(sizeStr))) : Math.min(10, Math.max(1, parseInt(sizeStr)));
+      if (isNaN(newSize)) return alert('Invalid size.');
+      if (isNode) {
+        nodes.update({ id: selectedId, size: newSize });
+      } else {
+        edges.update({ id: selectedId, width: newSize });
+      }
+    });
+
+    // Delete Node or Edge
+    deleteBtn.addEventListener('click', () => {
+      if (!selectedId) return alert('Select a node or edge first.');
+      if (selectedType === 'node') {
+        const connectedEdges = network.getConnectedEdges(selectedId);
+        edges.remove(connectedEdges);
+        nodes.remove(selectedId);
+      } else if (selectedType === 'edge') {
+        edges.remove(selectedId);
+      }
+      selectedId = null;
+      selectedType = null;
+      addingEdge = false;
+      edgeSourceId = null;
+      addConnectedNodeBtn.disabled = true;
+      renameBtn.disabled = true;
+      modifySizeBtn.disabled = true;
+      deleteBtn.disabled = true;
+      showSubgraphBtn.disabled = true;
+      resetHighlights();
+    });
+
+    // Clear All
+    clearAllBtn.addEventListener('click', () => {
+      nodes.clear();
+      edges.clear();
+      selectedId = null;
+      selectedType = null;
+      addingEdge = false;
+      edgeSourceId = null;
+      addConnectedNodeBtn.disabled = true;
+      renameBtn.disabled = true;
+      modifySizeBtn.disabled = true;
+      deleteBtn.disabled = true;
+      showSubgraphBtn.disabled = true;
+      if (subgraphContainer) {
+        doubleLine.remove();
+        subgraphTitle.remove();
+        subgraphContainer.remove();
+        clearSubgraphBtn.remove();
+        doubleLine = null;
+        subgraphTitle = null;
+        subgraphContainer = null;
+        subgraphNetwork = null;
+        clearSubgraphBtn = null;
+      }
+    });
+
+    // Show Subgraph
+    showSubgraphBtn.addEventListener('click', () => {
+      if (!selectedId || selectedType !== 'node') return alert('Select a node first.');
+      showSubgraphBtn.disabled = true;
+
+      doubleLine = document.createElement('hr');
+      doubleLine.className = 'double-line';
+      document.body.appendChild(doubleLine);
+
+      subgraphTitle = document.createElement('h1');
+      subgraphTitle.textContent = 'Subgraph of ' + nodes.get(selectedId).label;
+      document.body.appendChild(subgraphTitle);
+
+      subgraphContainer = document.createElement('div');
+      subgraphContainer.id = 'subgraph-cy';
+      document.body.appendChild(subgraphContainer);
+
+      const subgraphControls = document.createElement('div');
+      subgraphControls.id = 'subgraph-controls';
+      document.body.appendChild(subgraphControls);
+
+      clearSubgraphBtn = document.createElement('button');
+      clearSubgraphBtn.id = 'clearSubgraphBtn';
+      clearSubgraphBtn.textContent = 'Clear Subgraph';
+      subgraphControls.appendChild(clearSubgraphBtn);
+
+      // Collect two levels of incomers and outgoers
+      const collectedNodeIds = new Set([selectedId]);
+      const collectedEdgeIds = new Set();
+
+      // Level 1 outgoers
+      let level1OutNodes = network.getConnectedNodes(selectedId, 'to');
+      let level1OutEdges = edges.get(network.getConnectedEdges(selectedId)).filter(e => e.from === selectedId).map(e => e.id);
+      level1OutNodes.forEach(n => collectedNodeIds.add(n));
+      level1OutEdges.forEach(e => collectedEdgeIds.add(e));
+
+      // Level 2 outgoers
+      let level2OutNodes = level1OutNodes.flatMap(n => network.getConnectedNodes(n, 'to'));
+      let level2OutEdges = level1OutNodes.flatMap(n => edges.get(network.getConnectedEdges(n)).filter(e => e.from === n).map(e => e.id));
+      level2OutNodes.forEach(n => collectedNodeIds.add(n));
+      level2OutEdges.forEach(e => collectedEdgeIds.add(e));
+
+      // Level 1 incomers
+      let level1InNodes = network.getConnectedNodes(selectedId, 'from');
+      let level1InEdges = edges.get(network.getConnectedEdges(selectedId)).filter(e => e.to === selectedId).map(e => e.id);
+      level1InNodes.forEach(n => collectedNodeIds.add(n));
+      level1InEdges.forEach(e => collectedEdgeIds.add(e));
+
+      // Level 2 incomers
+      let level2InNodes = level1InNodes.flatMap(n => network.getConnectedNodes(n, 'from'));
+      let level2InEdges = level1InNodes.flatMap(n => edges.get(network.getConnectedEdges(n)).filter(e => e.to === n).map(e => e.id));
+      level2InNodes.forEach(n => collectedNodeIds.add(n));
+      level2InEdges.forEach(e => collectedEdgeIds.add(e));
+
+      const subgraphNodes = new vis.DataSet(nodes.get(Array.from(collectedNodeIds)).map(n => ({
+        ...n,
+        x: network.getPosition(n.id).x,
+        y: network.getPosition(n.id).y,
+        font: { color: '#000', size: 16 }
+      })));
+      const subgraphEdges = new vis.DataSet(edges.get(Array.from(collectedEdgeIds)));
+      console.log('Subgraph Nodes:', subgraphNodes.get());
+      console.log('Subgraph Edges:', subgraphEdges.get());
+      const subgraphData = { nodes: subgraphNodes, edges: subgraphEdges };
+      const subgraphOptions = { ...options };
+
+      subgraphNetwork = new vis.Network(subgraphContainer, subgraphData, subgraphOptions);
+
+      subgraphNetwork.on('click', (params) => {
+        subgraphNodes.forEach(node => {
+          subgraphNodes.update({ id: node.id, color: defaultNodeColor, font: { color: NodefontColor, size: 16 } });
+        });
+        subgraphEdges.forEach(edge => {
+          subgraphEdges.update({ id: edge.id, color: { color: defaultEdgeColor } });
+        });
+        if (params.nodes.length > 0) {
+          const subSelectedId = params.nodes[0];
+          subgraphNodes.update({ id: subSelectedId, color: defaultNodeColor, font: { color: NodefontColor, size: 16 } });
+          const subOutgoingEdges = subgraphEdges.get().filter(e => e.from === subSelectedId);
+          subOutgoingEdges.forEach(e => {
+            subgraphEdges.update({ id: e.id, color: { color: defaultEdgeColor } });
+            subgraphNodes.update({ id: e.to, color: highlightColor, font: { color: NodefontColor, size: 16 } });
+          });
+        } else if (params.edges.length > 0) {
+          const subSelectedId = params.edges[0];
+          subgraphEdges.update({ id: subSelectedId, color: { color: defaultEdgeColor } });
+        }
+      });
+
+      clearSubgraphBtn.addEventListener('click', () => {
+        if (subgraphContainer) {
+          doubleLine.remove();
+          subgraphTitle.remove();
+          subgraphContainer.remove();
+          clearSubgraphBtn.remove();
+          doubleLine = null;
+          subgraphTitle = null;
+          subgraphContainer = null;
+          subgraphNetwork = null;
+          clearSubgraphBtn = null;
+          showSubgraphBtn.disabled = false;
+        }
+      });
+    });
+
+    // Download as JSON
+    downloadJsonBtn.addEventListener('click', () => {
+      const exportData = {
+        nodes: nodes.get().map(n => ({
+          data: { id: n.id, label: n.label, size: n.size },
+          position: { x: network.getPosition(n.id).x, y: network.getPosition(n.id).y }
+        })),
+        edges: edges.get().map(e => ({
+          data: { id: e.id, label: e.label, source: e.from, target: e.to, size: e.width }
+        }))
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'graph' + new Date().toISOString() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
